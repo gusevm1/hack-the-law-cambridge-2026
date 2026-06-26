@@ -1,0 +1,28 @@
+project_id = "seowjktpscgkklvmlvep"
+
+[auth]
+site_url = "https://hack-the-law-cambridge-2026.vercel.app"
+additional_redirect_urls = [
+  "https://hack-the-law-cambridge-2026.vercel.app",
+  "http://localhost:3000",
+]
+
+# Restore values the project had before (CLI defaults differ from them).
+[auth.email]
+max_frequency = "1m0s"
+otp_length = 8
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[auth.external.github]
+enabled = true
+client_id = "Ov23lihXo04GE5pFHObL"
+# Secrets supplied at push time via env; never committed.
+secret = "env(SUPABASE_AUTH_EXTERNAL_GITHUB_SECRET)"
+
+[auth.external.google]
+enabled = true
+client_id = "319143117905-k30851klobtfo4j16p3a6iuqh805oqel.apps.googleusercontent.com"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
