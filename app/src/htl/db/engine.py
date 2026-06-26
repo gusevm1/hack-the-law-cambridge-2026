@@ -15,6 +15,7 @@ never touches a database.
 
 from __future__ import annotations
 
+import asyncio
 from functools import lru_cache
 from typing import Any
 
@@ -27,7 +28,7 @@ from sqlalchemy.ext.asyncio import (
 
 from htl.settings import settings
 
-# Held so the lifespan can close the connector's background tasks on shutdown.
+# Held so the lifespan can close the connector on shutdown.
 _connector: Any = None
 
 
@@ -36,10 +37,17 @@ def get_engine() -> AsyncEngine:
     if settings.instance_connection_name:
         from google.cloud.sql.connector import Connector
 
-        global _connector
-        _connector = Connector()
-
         async def getconn() -> Any:
+            # Create the Connector lazily, bound to the running loop. asyncpg
+            # invokes this creator ON the app's event loop, so the connector and
+            # its later connect_async calls share one loop — without an explicit
+            # loop, Connector() spins up its own background loop and connect_async
+            # raises ConnectorLoopError. ponytail: the None-check isn't locked; a
+            # simultaneous first-connect could build two connectors (one leaks,
+            # both valid) — add a lock only if that ever shows up.
+            global _connector
+            if _connector is None:
+                _connector = Connector(loop=asyncio.get_running_loop())
             return await _connector.connect_async(
                 settings.instance_connection_name,
                 "asyncpg",
