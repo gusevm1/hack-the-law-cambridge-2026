@@ -41,7 +41,11 @@ migrate:
     export DB_USER="${DB_USER:-htl_app}"
     export DB_NAME="${DB_NAME:-htl}"
     export DB_PASSWORD="$(gcloud secrets versions access latest --secret=htl-db-password --project="$PROJECT_ID")"
-    cd app && uv run alembic upgrade head
+    cd app
+    # The connector calls the SQL Admin API over TLS; point Python at certifi's
+    # CA bundle so verification works on machines without a system bundle (macOS).
+    export SSL_CERT_FILE="$(uv run python -m certifi)"
+    uv run alembic upgrade head
 
 # Build + deploy the API to Cloud Run. Override with PROJECT_ID=... REGION=...
 deploy:

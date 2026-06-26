@@ -70,8 +70,9 @@ def upgrade() -> None:
         ),
     )
 
+    # CAST so pg8000's varchar bind lands in the uuid column.
     op.execute(
-        sa.text("INSERT INTO users (id, email) VALUES (:id, :email)").bindparams(
+        sa.text("INSERT INTO users (id, email) VALUES (CAST(:id AS uuid), :email)").bindparams(
             id=STUB_USER_ID, email="dev@htl.local"
         )
     )
