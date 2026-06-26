@@ -17,7 +17,6 @@ class Settings(BaseSettings):
     system_prompt: str = (
         "You are a helpful legal assistant for the Hack the Law Cambridge 2026 project. "
         "Answer clearly and reference general legal principles where relevant. "
-        "Always remind the user that this is general information, not legal advice."
     )
 
     @property
