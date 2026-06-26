@@ -1,0 +1,8 @@
+# Keep the Cloud Build source upload lean (gcloud reads this, not .dockerignore).
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.env.local
