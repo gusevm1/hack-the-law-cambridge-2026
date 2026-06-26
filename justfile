@@ -28,6 +28,21 @@ build-web:
 gcp-bootstrap:
     ./infra/bootstrap.sh
 
+# Apply DB migrations to Cloud SQL via the connector + your gcloud ADC.
+# Account-portable: pulls the app password from Secret Manager, composes the
+# connection name from PROJECT_ID/REGION/DB_INSTANCE (same defaults as infra/).
+migrate:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    PROJECT_ID="${PROJECT_ID:-hack-the-law-cambridge-2026}"
+    REGION="${REGION:-europe-west1}"
+    DB_INSTANCE="${DB_INSTANCE:-htl-db}"
+    export INSTANCE_CONNECTION_NAME="${PROJECT_ID}:${REGION}:${DB_INSTANCE}"
+    export DB_USER="${DB_USER:-htl_app}"
+    export DB_NAME="${DB_NAME:-htl}"
+    export DB_PASSWORD="$(gcloud secrets versions access latest --secret=htl-db-password --project="$PROJECT_ID")"
+    cd app && uv run alembic upgrade head
+
 # Build + deploy the API to Cloud Run. Override with PROJECT_ID=... REGION=...
 deploy:
     ./infra/deploy.sh
