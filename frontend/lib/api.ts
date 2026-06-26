@@ -6,6 +6,7 @@ export type Turn = { role: "user" | "assistant"; content: string };
 
 export async function sendChat(message: string, history: Turn[]): Promise<string> {
   const token = await getAccessToken();
+  if (!token) throw new Error("Not signed in");
   const res = await fetch(`${API}/chat`, {
     method: "POST",
     headers: {
