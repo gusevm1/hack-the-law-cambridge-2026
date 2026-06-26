@@ -21,6 +21,8 @@ Read [`STATE.md`](../STATE.md) first — it's where we are right now. This file 
 
 Every shippable change rides the **`ship-feature`** skill (`.claude/skills/ship-feature/`): branch off `main` → atomic commits → PR → CI green → squash-merge to `main`. **`main` is production** (Vercel auto-deploys the frontend; backend via `just deploy`). Never commit straight to `main`. No separate dev/prod split — `main` + localhost only.
 
+When pausing multi-session work (or switching GCP accounts mid-task), invoke the **`write-handoff`** skill (`.claude/skills/write-handoff/`) to distill a brief for the next session.
+
 ## Quick reference
 
 ```sh
