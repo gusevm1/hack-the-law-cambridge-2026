@@ -14,5 +14,5 @@ Where the project is right now. Update this as reality moves.
 
 ## Next / open
 - Tomorrow: switch to admin GCP account → `PROJECT_ID=<new> CREATE_PROJECT=1 ... just gcp-bootstrap && just deploy`, then update `NEXT_PUBLIC_API_URL`.
-- Auth (Supabase JWT) deferred — `routes/` is the seam.
+- **Auth (Supabase JWT):** planned — brief at `.claude/handoffs/auth-supabase-jwt.md`. Gate `/chat` with a verifier dependency mirroring jobmatch-ch (no DB here → Principal is just sub+email). Blocked only on confirming the Supabase project's signing alg (ES256/JWKS vs HS256).
 - Pick the real legal use-case from the released challenge and shape the system prompt / endpoints around it.
