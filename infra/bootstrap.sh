@@ -68,9 +68,12 @@ DB_PASSWORD_SECRET="${DB_PASSWORD_SECRET:-htl-db-password}"
 
 if ! gcloud sql instances describe "$DB_INSTANCE" --project="$PROJECT_ID" >/dev/null 2>&1; then
   echo "==> Creating Cloud SQL instance $DB_INSTANCE (POSTGRES_16, db-f1-micro) — a few minutes"
+  # ENTERPRISE edition is required for the cheap shared-core db-f1-micro tier
+  # (the default ENTERPRISE_PLUS rejects it).
   gcloud sql instances create "$DB_INSTANCE" \
     --project="$PROJECT_ID" \
     --database-version=POSTGRES_16 \
+    --edition=ENTERPRISE \
     --tier=db-f1-micro \
     --region="$REGION" \
     --storage-size=10 --storage-type=HDD \
