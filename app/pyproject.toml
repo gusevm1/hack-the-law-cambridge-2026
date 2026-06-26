@@ -10,6 +10,15 @@ dependencies = [
     "pydantic-settings>=2.6,<3.0",
     # Gemini via Vertex AI — auth is GCP ADC, no API key. Async via client.aio.
     "google-genai>=1.0,<2.0",
+    # Postgres app data: async runtime (asyncpg) + alembic migrations (pg8000),
+    # both dialed through the Cloud SQL connector (IAM auth, no proxy).
+    "sqlalchemy[asyncio]>=2.0,<3.0",
+    "cloud-sql-python-connector[asyncpg,pg8000]>=1.12,<2.0",
+    "alembic>=1.13,<2.0",
+    # Supabase JWT verification (ES256/JWKS); crypto extra pulls cryptography.
+    "pyjwt[crypto]>=2.9,<3.0",
+    "structlog>=24.0,<26.0",
+    "python-ulid>=2.7,<4.0",
 ]
 
 [dependency-groups]
@@ -29,3 +38,4 @@ packages = ["src/htl"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+asyncio_mode = "auto"
