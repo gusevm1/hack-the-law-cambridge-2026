@@ -25,18 +25,6 @@ async function request<T>(
   return (await res.json()) as T;
 }
 
-// --- /chat (authed) --------------------------------------------------------- #
-export type Turn = { role: "user" | "assistant"; content: string };
-
-export async function sendChat(message: string, history: Turn[]): Promise<string> {
-  const data = await request<{ reply: string }>("/chat", {
-    method: "POST",
-    body: { message, history },
-    auth: true,
-  });
-  return data.reply;
-}
-
 // --- Citator types — mirror app/src/htl/models/api.py exactly ---------------- #
 export type ResolveResult = {
   found: boolean;
