@@ -3,23 +3,26 @@
 Where the project is right now. Update this as reality moves.
 
 ## Now
+- **Citator pipeline COMPLETE + DEPLOYED** — all five stages (Filter · Classify · Deep-analyzer · Propositions · Use-aware Verdict) shipped to `main` and live on Cloud Run (rev `htl-api-00005-rsn`) + Vercel. The `/citator/analyze` stepper walks the full Bruen flow end-to-end; the frontend is fully wired to the backend (every fetcher → a live endpoint, CORS `*`). Details under **Citator** below.
 - Scaffold + **production backend foundation shipped** (PR #6): Supabase JWT auth (ES256/JWKS), Cloud SQL Postgres (`users` + `messages`) via async SQLAlchemy + the Cloud SQL connector + Alembic, correlation IDs, structured JSON logging, and a uniform error envelope.
 - `POST /chat` is gated behind a verified user and persists both turns (user + assistant), stamped with the user + correlation id. `get_verifier` auto-selects Supabase (when JWKS+issuer set) else a dev/CI stub.
 - Backend on Cloud Run; Gemini-on-Vertex wired (async, ADC auth). Frontend: real **login** (email/password + Google/GitHub buttons) gating the chat, with the signed-in email + sign-out in the top-right; `/chat` calls carry the session `Bearer`.
 
 ## Live
 - **GCP project:** `llm-law-cambridge26cbx-522` ("Hack the Law-522" — Google-managed dev sandbox, account `devstar5221@gcplab.me`, org "No organization"). Switched off the old throwaway `hack-the-law-cambridge-2026` on 2026-06-27 via `bootstrap` + public-IP migrate + `deploy`.
-- **Cloud Run service:** `htl-api` @ `europe-west1`. URL: `https://htl-api-4h4hpkfmqq-ew.a.run.app` (revision `htl-api-00003-2l7`). Cloud SQL attached + Supabase env (issuer/JWKS unchanged). Live: `/health` → ok; `/cases/{id}/risk` → 200 (runtime compute SA reaches Cloud SQL via the connector); `/cases/{id}/citations` + `/cases/{id}/triage` → 200 (DB-independent stub + pure filter); `/cases/{id}/classify` → 200 (real Gemini via the runtime SA — Rahimi→limited/P2a etc.). Public (`--allow-unauthenticated`); the app-level JWT gate is the real access control. Deploy from a laptop with `PROJECT_ID=llm-law-cambridge26cbx-522 just deploy` (the script's default PROJECT_ID is still the old throwaway).
+- **Cloud Run service:** `htl-api` @ `europe-west1`. URL: `https://htl-api-4h4hpkfmqq-ew.a.run.app` (revision `htl-api-00005-rsn`). Cloud SQL attached + Supabase env (issuer/JWKS unchanged). Live (all → 200): `/health`; `/resolve`; `/ask`; `/cases/{id}/risk` (runtime SA reaches Cloud SQL via the connector); the full citator pipeline `/cases/{id}/{citations,triage,classify,analyze,propositions,verdict}` (DB-independent stub + filter + real Gemini via the runtime SA — Rahimi→limited/P2a etc.). Public (`--allow-unauthenticated`); the app-level JWT gate is the real access control. **Deploy with `just deploy`** — project/region now flow from `infra/env.sh`, the single source of truth (PR #40); override any value via env.
 - **Cloud SQL:** `htl-db` @ `europe-west1` (POSTGRES_16, db-f1-micro, ENTERPRISE edition). DB `htl`, user `htl_app` (password in Secret Manager `htl-db-password`). Conn: `llm-law-cambridge26cbx-522:europe-west1:htl-db`. **Migrated to `0002`**, then ingested + classified on prod (150 `cl_opinions`, 157 `citation_edges`, `treatments` populated). ⚠️ The Cloud SQL **connector** (`connectSettings` API) is blocked for the **user** identity on this sandbox (`boss::NOT_AUTHORIZED`, even with `editor`+`cloudsql.client` — a higher-level lab guardrail, no project deny policy), so `just migrate` fails from a laptop. Workaround for migrate/ingest from a laptop: allowlist your egress IP (`gcloud sql instances patch htl-db --authorized-networks=<ip>/32`) and run alembic/scripts with `DATABASE_URL=postgresql+pg8000://htl_app:<pw>@<public-ip>:5432/htl` and `INSTANCE_CONNECTION_NAME=""`. The **runtime SA on Cloud Run is NOT blocked** — it uses the connector normally.
 - **Vercel:** `https://hack-the-law-cambridge-2026.vercel.app` (live, `main` auto-deploys). `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` set in Production. ✅ `NEXT_PUBLIC_API_URL` is correct — Production builds against `https://htl-api-4h4hpkfmqq-ew.a.run.app` (verified in the live bundle 2026-06-27).
 - **Supabase** (auth-only): project `hack-the-law-cambridge-2026`, ref `seowjktpscgkklvmlvep` (London), ES256/JWKS. Persists across the GCP account switch.
 
-## Open citator (live: /resolve + /cases/{id}/{risk,citations,triage,classify,analyze,propositions})
+## Citator (live: /resolve · /ask · /cases/{id}/{risk,citations,triage,classify,analyze,propositions,verdict})
 - **Proposition-level pipeline — Features 1 (Filter) + 2 (Classify) + 3 (Deep
-  analyzer / A) + 4 (Propositions / B) SHIPPED + DEPLOYED** (PRs #26, #27, #35, #36;
-  prod revision `htl-api-00004-tjz`, real Gemini via the runtime SA). The aligned spec is
+  analyzer / A) + 4 (Propositions / B) + 5 (Use-aware Verdict / C) ALL SHIPPED +
+  DEPLOYED** (PRs #26, #27, #35, #36, #37; prod revision `htl-api-00005-rsn`, real
+  Gemini via the runtime SA). The aligned spec is
   `.claude/handoffs/citator-pipeline-scope.md` (vision → retrieval contract →
-  proposition spine P1–P8 → Bruen golden example → per-feature roadmap).
+  proposition spine P1–P8 → Bruen golden example → per-feature roadmap). The shipped
+  feature handoffs (A/B/C) + the parallel-build contracts are in `handoffs/archive/`.
   - **F1 Filter** — `citator/triage.py::tier_edges` (pure, mirrors `risk.py`) tiers
     inbound edges `deep|shallow|mention`, never drops (noise → `mention`). `GET
     /cases/{id}/citations` is a contract-true **stub** of the retrieval engine
@@ -45,18 +48,22 @@ Where the project is right now. Update this as reality moves.
   - **F4 Propositions (B)** — `GET /cases/{id}/propositions` aggregates findings per
     proposition → signed risk + evolution + trajectory + the composed **operative
     rule**. Live Bruen: "good law as modified by Rahimi (2024)"; P1/P2 green,
-    P2a/P3/P4/P5 amber. Contract B.
+    P2a/P3/P4/P5 amber. Contract B. ⚠️ Reads its own deterministic golden mock
+    (`citator/golden_analysis.py`), **not** A's live `/analyze` — chosen for demo
+    determinism; one-line swap to share A's read when wanted.
+  - **F5 Use-aware Verdict (C)** — `POST /cases/{id}/verdict` maps the lawyer's
+    intended use → the propositions it depends on (`llm/usemap.py`: deterministic for
+    the menu picks, model for free-form), intersects with the compromised props from
+    B → `real_risk` *for this use* + grounded explanation + `final_labels`. Consumes B
+    directly (`routes/verdict.py` imports `case_propositions`). Live: §922(g)/P5 use →
+    real risk; P1 use → no real risk (same case, opposite answer). Contract C.
   - Proposition spine is one source of truth: `citator/propositions.py`.
   - All endpoints public, DB-independent. Frontend `/citator/analyze` is the
-    pipeline **stepper**: Resolve → Citations → Treatment → Relation (all live) →
-    Verdict (placeholder for Feature 5). Grouped by proposition throughout.
+    pipeline **stepper**: Resolve → Citations → Treatment → Relation → Verdict —
+    **all five live**. Grouped by proposition throughout.
   - **Retrieval engineer's ingestion contract:**
     `.claude/handoffs/retrieval-ingestion-contract.md` (wire shape + the per-edge
     `passage` column to add on `citation_edges`).
-- **Next pipeline feature** (its own PR, consumes the prior stage): **5 Verdict (C)**
-  — use-aware: `POST /cases/{id}/verdict` maps the lawyer's intended use → the
-  propositions it depends on, intersects with the compromised ones → risk *for this
-  use* (Contract C). Features 3 Relate + 4 Aggregate shipped above.
 - **Tables** (migration `0002_citator`): `cl_opinions` (CL id PK, case_name, court, date_filed, citation, plain_text, source), `citation_edges` (composite PK citing_id+cited_id, depth), `treatments` (empty — a later agent classifies passages into it). Models in `app/src/htl/db/citator.py`.
 - **Ingestion**: `cd app && uv run python scripts/ingest_citator.py` (idempotent upserts; `--seed` for an offline real-overrulings fallback). **No CL token needed** — uses the CourtListener v4 **search** endpoint (`q=cites:(<op_id>) "<cite>"&highlight=on`), which returns the inbound graph + a citing-passage snippet stored as `plain_text`. A `COURTLISTENER_TOKEN` only adds optional full-text enrichment (paced ≤4/min via `/opinions/<id>/`).
 - **Seeded the 4 LoC "Decisions Overruled" targets**: Roe (108713), Plessy (94508), Bowers (111738), Lochner (96276). Live run: 150 `cl_opinions`, 157 `citation_edges`, all `source=cl_api`; snippets carry real treatment language (e.g. a Roe citer: "...overruled Casey and Roe v. Wade... See Dobbs").
@@ -67,10 +74,12 @@ Where the project is right now. Update this as reality moves.
 - **Caveats / next:** prod Cloud SQL is now migrated + deployed + seeded (150/157). ⚠️ **prod `treatments` were written by the keyword-fallback**, not Gemini — the sandbox blocks the *user* identity from Vertex `predict` (the runtime SA works fine: `/ask` + `/chat` return real Gemini), so a laptop re-classify can't reach prod; real-Gemini reclassify on prod is a retrieval/analysis follow-up (the next feature assumes verdict quality is good enough). The local Docker DB still holds the validated gemini-2.5-flash set. The **Smith #112404 false-red** is now a *retrieval* bug (snippet noise + mis-attribution + dup passages — see the retrieval brief), not an analysis one. Still open: a not-yet-overruled **"amber"** case to demo erosion, expand ground-truth, then `just migrate` + classify + `just deploy` for prod (tied to the admin-GCP-account switch). Backend/classifier forensic detail: `.claude/handoffs/archive/citator-endpoints.md`.
 - **Tuning fixtures (local DB, overnight validation):** Auer v. Robbins (`118089`, **green** 0.137 — non-red graded path validated, safe from false-red) and Employment Division v. Smith (`112404`, **FALSE RED** — classifier mis-read the *legislative* "abrogated by enacting RFRA" snippet as judicial overruling + mis-attributed it to an unrelated case). The Smith false-red is the **#1 reliability fix** (distinguish legislative vs judicial abrogation; require corroboration before dispositive red — see handoff). Amber *label* branch still unhit on live data.
 - **Frontend** (PRs #16, #20, #21): `/citator` (public) — search → resolve → risk; signal card + CSS-bar erosion trend + treatments + 6 quick-pick chips. **`/assistant`** (public, PR #21) — the flagship: free-form case + a litigation-use dropdown → agentic `/ask` → grounded answer + `<VerdictCard>` + CourtListener link. **Local auth works** (`frontend/.env.local`: real Supabase publishable key + localhost API; backend on stub verifier; email login `demo@hacklaw.app`/`hacklaw2026`). Query layer unified in `lib/api.ts` (`request()` + typed `resolve`/`caseRisk`/`ask`); `<VerdictCard>` shared (PR #20).
-- **`POST /ask`** (PR #21, public): agentic **Gemini-2.5-pro** function-calling loop (tools `resolve_case` + `get_case_risk`, max 5 rounds) → grounded good-law answer **tailored to the lawyer's intended use**. The route captures the resolve+risk tool results and returns them alongside the prose, so `<VerdictCard>` renders from verified data, never model text. Verified live on localhost (Roe→red/Dobbs, Auer→green-with-caveat). **Prod caveat:** the live Vercel `/assistant` 500s on submit until the backend is promoted (no `/ask`/data in prod yet).
+- **`POST /ask`** (PR #21, public): agentic **Gemini-2.5-pro** function-calling loop (tools `resolve_case` + `get_case_risk`, max 5 rounds) → grounded good-law answer **tailored to the lawyer's intended use**. The route captures the resolve+risk tool results and returns them alongside the prose, so `<VerdictCard>` renders from verified data, never model text. Verified live on localhost (Roe→red/Dobbs, Auer→green-with-caveat). `/ask` is **now deployed** (rev `00005`), so the live Vercel `/assistant` no longer 500s on submit; answer quality depends on the DB-seeded data (the 4 overruling targets) + the CL-search fallback for non-seeded cases.
 
 ## Next / open
 - **Auth providers.** Email/password is **live** (demo login: `demo@hacklaw.app` / `hacklaw2026`, a confirmed user seeded via the admin API). New self-serve signups need email confirmation OFF to log in instantly. **Google/GitHub** buttons are wired but need each provider enabled in Supabase (OAuth app client id/secret) + the Site URL / redirect allowlist set to the Vercel prod URL + `http://localhost:3000`. All of this is Supabase-dashboard / OAuth-console work (or `PATCH config/auth` with a Supabase PAT).
 - Vercel env: Supabase publishable vars set in Production (+ the merged feature branch's Preview). `NEXT_PUBLIC_API_URL` stays Production-only.
-- Tomorrow: switch to admin GCP account → `PROJECT_ID=<new> CREATE_PROJECT=1 ... just gcp-bootstrap && just migrate && just deploy`, then update `NEXT_PUBLIC_API_URL`. Infra is account-portable; Supabase ref carries over.
+- ✅ **GCP account switch DONE** — running on `llm-law-cambridge26cbx-522`, deployed, `NEXT_PUBLIC_API_URL` set. Account/project config centralized in `infra/env.sh` (PR #40); `just deploy` needs no prefix. Supabase ref carries over.
+- **Minor cleanup (optional):** `lib/api.ts` has two now-unused fetchers — `caseCitations` and `caseClassify` (the Treatment step moved to `caseAnalyze` when A shipped). Dead, harmless; remove when convenient.
+- **Optional integration:** wire B's `/propositions` to A's live `/analyze` instead of its golden mock (one line) if you want the Treatment + Relation steps sharing one source on non-Bruen cases.
 - Pick the real legal use-case from the released challenge and shape the system prompt / endpoints around it. (Messages persistence is a demo of "stores stuff" — keep or reshape per the product.)
