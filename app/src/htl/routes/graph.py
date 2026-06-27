@@ -18,7 +18,7 @@ from datetime import date
 from fastapi import APIRouter
 from sqlalchemy import func, select
 
-from htl.citator.risk import NEGATIVE, POSITIVE, CitingTreatment, aggregate_risk
+from htl.citator.risk import CitingTreatment, aggregate_risk, polarity_label
 from htl.db.citator import CitationEdge, ClOpinion, Treatment
 from htl.models.api import CaseRef, GraphEdge, GraphNode, GraphResponse
 from htl.routes.dependencies import DbSession
@@ -40,17 +40,9 @@ def _source_url(cluster_id: int, name: str | None) -> str:
     return _CL_OPINION.format(cid=cluster_id, slug=_slug(name))
 
 
-def _polarity(type_: str | None) -> str:
-    if type_ in NEGATIVE:
-        return "negative"
-    if type_ in POSITIVE:
-        return "positive"
-    return "neutral"
-
-
 def _rank(type_: str | None, conf: float | None) -> tuple[int, float]:
     """Pick-the-worst ordering per citer: negative > positive > neutral, then conf."""
-    pol = {"negative": 2, "positive": 1, "neutral": 0}[_polarity(type_)]
+    pol = {"negative": 2, "positive": 1, "neutral": 0}[polarity_label(type_)]
     return (pol, conf if conf is not None else 0.0)
 
 
@@ -132,7 +124,7 @@ async def case_graph(case_id: int, session: DbSession) -> GraphResponse:
                 citing_id=c.id,
                 cited_id=case_id,
                 treatment=t.type if t else None,
-                polarity=_polarity(t.type) if t else "neutral",
+                polarity=polarity_label(t.type) if t else "neutral",
                 confidence=t.confidence if t else None,
                 quote=t.quote if t else None,
                 on_other_grounds=bool(t.on_other_grounds) if t else False,

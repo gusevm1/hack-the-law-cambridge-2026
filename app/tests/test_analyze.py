@@ -16,7 +16,14 @@ import htl.routes.analyze as analyze_route
 from htl.citator.golden import BRUEN_ID, full_text_for
 from htl.llm.analyze import EdgeAnalysis, Finding, analyze_edge
 from htl.main import app
-from htl.models.api import CaseRef, CitingCaseRef, TieredEdge, TriageSignals
+from htl.models.api import (
+    CaseRef,
+    CitationsResponse,
+    CitingCaseRef,
+    Edge,
+    TieredEdge,
+    TriageSignals,
+)
 
 _CASE = CaseRef(case_id=BRUEN_ID, case_name="Bruen", citation="597 U.S. 1", court="scotus")
 
@@ -115,3 +122,36 @@ def test_analyze_route(monkeypatch) -> None:
     order = {"deep": 0, "shallow": 1, "mention": 2}
     tiers = [order[e["tier"]] for e in j["edges"]]
     assert tiers == sorted(tiers)
+
+
+def _engaging_edge(treatment: str) -> Edge:
+    """Same worth-it (shallow) passage for both; only the persisted treatment differs,
+    so the neutral gate is the sole reason one is read and the other is skipped."""
+    return Edge(
+        citing_case=CitingCaseRef(case_name="Some v. Case", court="ca3", date_filed="2024-01-01"),
+        citation="1 F.4th 1",
+        passage="The court distinguished Bruen; the historical twin requirement is not met.",
+        source="graph",
+        treatment=treatment,
+    )
+
+
+def test_analyze_skips_neutral_citers(monkeypatch) -> None:
+    # Two identically-tiered citers; one cites Bruen neutrally, one engages it.
+    async def _fake_load(session, case_id):
+        return CitationsResponse(
+            case=_CASE,
+            total=2,
+            edges=[_engaging_edge("cited-neutral"), _engaging_edge("followed")],
+        )
+
+    monkeypatch.setattr(analyze_route, "load_citations", _fake_load)
+    monkeypatch.setattr(analyze_route, "analyze_edge", _fake_analyze)
+    j = TestClient(app).get(f"/cases/{BRUEN_ID}/analyze").json()
+
+    assert j["analyzed"] == 1 and j["skipped_neutral"] == 1
+    by_treatment = {e["treatment"]: e for e in j["edges"]}
+    assert by_treatment["cited-neutral"]["findings"] == []  # neutral → not read
+    assert by_treatment["cited-neutral"]["model"] == ""
+    assert by_treatment["followed"]["model"] == "test-stub"  # engaged → read
+    assert len(by_treatment["followed"]["findings"]) >= 1

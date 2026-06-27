@@ -6,16 +6,17 @@ edge colour and the source link (the receipt) so they can't silently drift.
 
 from __future__ import annotations
 
-from htl.routes.graph import _polarity, _rank, _slug, _source_url
+from htl.citator.risk import polarity_label
+from htl.routes.graph import _rank, _slug, _source_url
 
 
 def test_polarity_matches_risk_sets() -> None:
-    assert _polarity("overruled") == "negative"
-    assert _polarity("limited") == "negative"
-    assert _polarity("followed") == "positive"
-    assert _polarity("distinguished") == "neutral"
-    assert _polarity("cited-neutral") == "neutral"
-    assert _polarity(None) == "neutral"
+    assert polarity_label("overruled") == "negative"
+    assert polarity_label("limited") == "negative"
+    assert polarity_label("followed") == "positive"
+    assert polarity_label("distinguished") == "neutral"
+    assert polarity_label("cited-neutral") == "neutral"
+    assert polarity_label(None) == "neutral"
 
 
 def test_rank_orders_negative_over_positive_over_neutral() -> None:

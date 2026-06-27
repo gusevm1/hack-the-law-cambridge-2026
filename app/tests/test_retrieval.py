@@ -36,8 +36,9 @@ class _Result:
 
 
 class _SeqSession:
-    """Returns queued results in call order: first execute() = the target row,
-    second = the edge rows (the two queries load_citations issues)."""
+    """Returns queued results in call order: target row, then edge rows, then the
+    per-citer treatments (the three queries load_citations issues when the DB has
+    rows; the golden fallback returns before the treatments query)."""
 
     def __init__(self, *results: _Result) -> None:
         self._results, self._i = list(results), 0
@@ -68,7 +69,11 @@ def test_db_rows_map_to_edges() -> None:
         date_filed=date(2024, 6, 21), citation="602 U.S. 680",
         plain_text="...not a law trapped in amber...", source="cl_api",
     )
-    sess = _SeqSession(_Result(first=case_row), _Result(rows=[edge_row]))
+    # Two treatment rows for the same citer → the most severe (negative) wins.
+    treat_rows = [(999, "followed"), (999, "criticised")]
+    sess = _SeqSession(
+        _Result(first=case_row), _Result(rows=[edge_row]), _Result(rows=treat_rows)
+    )
     resp = asyncio.run(load_citations(sess, BRUEN_ID))
 
     assert resp.case.date_filed == "2022-06-23"
@@ -80,3 +85,4 @@ def test_db_rows_map_to_edges() -> None:
     assert e.passage == "...not a law trapped in amber..."
     assert e.source == "cl_api"
     assert e.opinion_url.endswith("/opinion/999/united-states-v-rahimi/")
+    assert e.treatment == "criticised"  # most-severe per citer, attached to the edge
