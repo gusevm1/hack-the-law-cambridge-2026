@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     gcp_project: str = "hack-the-law-cambridge-2026"
     vertex_location: str = "global"
     gemini_model: str = "gemini-2.5-flash"
+    ask_model: str = "gemini-2.5-pro"  # the flagship agentic /ask uses the max model
 
     # --- Database -----------------------------------------------------------
     # Cloud SQL via the connector when instance_connection_name is set (prod +
