@@ -182,6 +182,24 @@ export async function ask(caseText: string, use: string): Promise<AskResult> {
   return request("/ask", { method: "POST", body: { case: caseText, use } });
 }
 
+// --- /chat — citator-aware conversational assistant (public) ---------------- #
+// Mirrors app/src/htl/models/api.py ChatTurn/ChatRequest/ChatResponse. Multi-turn;
+// pass `caseId` to scope the conversation to the case on screen (analysis-page
+// chat), omit it for the global doctrinal chat.
+export type ChatTurn = { role: "user" | "assistant"; content: string };
+
+export async function chat(
+  message: string,
+  history: ChatTurn[] = [],
+  caseId?: number,
+): Promise<string> {
+  const { reply } = await request<{ reply: string }>("/chat", {
+    method: "POST",
+    body: { message, history, ...(caseId != null ? { case_id: caseId } : {}) },
+  });
+  return reply;
+}
+
 // --- Citations + triage (citator filter stage) — mirror api.py exactly ------ #
 export type Edge = {
   citing_case: CitingCaseRef;
