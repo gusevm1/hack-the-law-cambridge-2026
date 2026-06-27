@@ -424,7 +424,7 @@ def seed_case(citation: str) -> CaseData | None:
 # --------------------------------------------------------------------------- #
 # HTTP + DB plumbing.                                                          #
 # --------------------------------------------------------------------------- #
-def http_get_json(url: str, *, token: str | None = None, timeout: int = 30,
+def http_get_json(url: str, *, token: str | None = None, timeout: int = 60,
                   retries: int = 4) -> dict[str, Any]:
     """All CourtListener access goes through the single-flight, globally-paced
     client (lock + ≥20s spacing + 429 backoff) so concurrent callers can't race
