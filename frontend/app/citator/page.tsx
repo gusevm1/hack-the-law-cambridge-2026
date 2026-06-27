@@ -91,7 +91,7 @@ export default function Citator() {
   const [risk, setRisk] = useState<RiskResult | null>(null);
   const [triage, setTriage] = useState<TriageResult | null>(null);
   const [selected, setSelected] = useState<GraphEdge | null>(null);
-  const [negativeOnly, setNegativeOnly] = useState(false);
+  const [hideNeutral, setHideNeutral] = useState(false);
 
   const load = useCallback(async (id: number) => {
     setError(null);
@@ -214,14 +214,14 @@ export default function Citator() {
                   <Legend />
                   <button
                     type="button"
-                    onClick={() => setNegativeOnly((v) => !v)}
+                    onClick={() => setHideNeutral((v) => !v)}
                     className={`rounded-full px-3 py-1 transition ${
-                      negativeOnly
-                        ? "bg-red-500/20 text-red-300 ring-1 ring-red-500/40"
+                      hideNeutral
+                        ? "bg-white/15 text-white ring-1 ring-white/30"
                         : "bg-white/5 text-slate-300 ring-1 ring-white/10 hover:bg-white/10"
                     }`}
                   >
-                    {negativeOnly ? "Showing negative only" : "Negative only"}
+                    {hideNeutral ? "Treated only" : "Hide neutral"}
                   </button>
                 </div>
                 {loading ? (
@@ -229,7 +229,7 @@ export default function Citator() {
                     Loading network…
                   </div>
                 ) : (
-                  <CitationGraph graph={graph} onSelect={setSelected} negativeOnly={negativeOnly} />
+                  <CitationGraph graph={graph} onSelect={setSelected} hideNeutral={hideNeutral} />
                 )}
               </div>
 
