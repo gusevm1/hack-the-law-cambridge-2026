@@ -95,3 +95,62 @@ body {
     animation: none;
   }
 }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   SIGN-IN CONSTELLATION BACKDROP — ported from jobmatch-ch, recoloured to our
+   teal accent. A citation graph forming and dissolving behind the auth card.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Hairline engineering-paper grid, mask-faded toward the edges. */
+.bg-grid {
+  background-image:
+    linear-gradient(to right, var(--border) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+.bg-grid-fade {
+  -webkit-mask-image: radial-gradient(ellipse 60% 70% at 50% 40%, #000 30%, transparent 80%);
+          mask-image: radial-gradient(ellipse 60% 70% at 50% 40%, #000 30%, transparent 80%);
+}
+
+/* Subtle grain — tactile feel without a noise library. */
+.bg-grain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='7'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+/* Slow drift for the ambient teal glows. */
+@keyframes drift {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -20px, 0); }
+}
+.animate-drift { animation: drift 14s ease-in-out infinite; }
+
+/* The constellation. pathLength="1" normalises every line so one dash rule
+   draws them all regardless of length; edges draw in then dissolve, nodes
+   pulse. Per-element timing comes from inline --dur / --delay. Static when
+   reduced-motion is requested (the base opacities below). */
+.edge { opacity: 0.16; stroke-dasharray: 1; }
+.node { opacity: 0.5; }
+
+@keyframes edge-draw {
+  0% { stroke-dashoffset: 1; opacity: 0; }
+  14% { opacity: 0.5; }
+  32% { stroke-dashoffset: 0; opacity: 0.5; }
+  60% { stroke-dashoffset: 0; opacity: 0.5; }
+  74% { opacity: 0; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
+}
+@keyframes node-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.85; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .edge { animation: edge-draw var(--dur, 8s) cubic-bezier(0.4, 0, 0.2, 1) var(--delay, 0s) infinite; }
+  .node { animation: node-pulse 4.2s ease-in-out var(--delay, 0s) infinite; }
+}
