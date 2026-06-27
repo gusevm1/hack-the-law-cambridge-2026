@@ -71,9 +71,10 @@ that cites Bruen and Heller has two different passages.
 
 So:
 
-**`cl_opinions`** (one row per opinion — citing *and* cited) — already sufficient:
+**`cl_opinions`** (one row per opinion — citing *and* cited):
 `id` (CL cluster id, PK) · `case_name` · `court` (CL slug) · `date_filed` (date) ·
-`citation` (lead cite) · `source`. → **Action: also ingest the target row** (Bruen
+`citation` (lead cite) · `source` · **`plain_text` = the FULL opinion text** (see
+§2a — now required, not optional). → **Action: also ingest the target row** (Bruen
 6480696) so `/citations` and `/resolve` can serve its metadata.
 
 **`citation_edges`** (one row per inbound edge) — needs new columns:
@@ -87,12 +88,36 @@ So:
 | **`matched_citation`** | ➕ add | TEXT null | which parallel cite matched |
 
 `opinion_url` is derived (`/opinion/{citing_id}/`), so no column needed.
-`cl_opinions.plain_text` can stay for optional full-text enrichment — it's just no
-longer the source of the per-edge passage.
 
 The `/citations` route then becomes: load `cl_opinions[cited_id]` for `case`, join
 `citation_edges ⋈ cl_opinions` on `citing_id` for the edges. (Same join shape as
 `routes/risk.py`, plus the three new edge columns.)
+
+## 2a. Full opinion text — REQUIRED, and the hard part (locked decision)
+
+The **deep-analysis stage (Feature 3) reads the full citing opinion**, not the
+snippet — that's how the model actually *finds* the treatment (locate the discussion
+across paragraphs, even cited-by-name) instead of guessing from a highlight window.
+
+**Decision: retrieval persists the full opinion text in `cl_opinions.plain_text`,
+keyed by opinion id; the analysis stage reads it from the DB by id.** Rationale:
+retrieval already fetched the opinion to find the cite, so re-fetching downstream
+duplicates work and needs a second CL-token/rate-limit owner; persisting makes
+analysis fast, deterministic, and offline-testable, and avoids shipping 100 KB blobs
+per edge over the API (the wire contract carries the **id + snippet**; full text
+lives in Postgres).
+
+⚠️ **Sourcing full text is genuinely hard — flagged, in your lane.** Verified on
+2026-06-27 against CL: SCOTUS opinions have full text (Rahimi = 222K chars), but
+**recent F.4th circuit opinions return empty** `plain_text`/html *and* no
+`download_url` (Antonyuk, Range, Wolford all 0 chars across every field). These are
+the gun-law battlegrounds, so this gap is the pipeline's #1 data risk. Options to
+close it (your call): court-site / CAP / Google Scholar text, PDF extraction from
+`download_url` where present (note scope §9: some slip PDFs 403 fetchers), or a
+commercial export. **Until text exists for an edge, mark it so:** analysis degrades
+to snippet mode (lower confidence) rather than fabricating depth. Where you *can*
+supply full text, set `plain_text`; where you can't, leave it null and the analyzer
+flags `analysis_depth="snippet"`.
 
 ---
 
