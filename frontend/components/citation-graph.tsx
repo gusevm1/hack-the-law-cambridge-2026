@@ -170,15 +170,24 @@ export function CitationGraph({
   }, [graph, onSelect]);
 
   return (
-    <ReactFlow
-      nodes={nodes} edges={edges} nodeTypes={nodeTypes}
-      onEdgeClick={onEdgeClick} onNodeClick={onNodeClick}
-      fitView fitViewOptions={{ padding: 0.15 }}
-      proOptions={{ hideAttribution: true }} minZoom={0.2}
-      className="bg-transparent"
-    >
-      <Background color="#334155" gap={28} size={1} />
-      <Controls showInteractive={false} className="!bg-slate-800 !border-white/10" />
-    </ReactFlow>
+    <>
+      <style>{`
+        .react-flow__controls { box-shadow: none; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,.08) }
+        .react-flow__controls-button { background:#0f172a; border-bottom:1px solid rgba(255,255,255,.06); width:30px; height:30px }
+        .react-flow__controls-button:hover { background:#1e293b }
+        .react-flow__controls-button svg { fill:#94a3b8; max-width:14px; max-height:14px }
+        .react-flow__controls-button:last-child { border-bottom: 0 }
+      `}</style>
+      <ReactFlow
+        nodes={nodes} edges={edges} nodeTypes={nodeTypes}
+        onEdgeClick={onEdgeClick} onNodeClick={onNodeClick}
+        fitView fitViewOptions={{ padding: 0.15 }}
+        proOptions={{ hideAttribution: true }} minZoom={0.2}
+        className="bg-transparent"
+      >
+        <Background color="#334155" gap={28} size={1} />
+        <Controls showInteractive={false} />
+      </ReactFlow>
+    </>
   );
 }
