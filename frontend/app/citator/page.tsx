@@ -9,6 +9,8 @@
 // routes/{resolve,graph,risk,triage,verdict}.py.
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useAuth } from "../../lib/auth";
+import { AccountMenu } from "../../components/account-menu";
 import { CitationGraph } from "../../components/citation-graph";
 import { SourceCard } from "../../components/source-card";
 import { VerdictBadge } from "../../components/verdict-badge";
@@ -83,6 +85,8 @@ function groupByProposition(edges: TieredEdge[]) {
 const API_DOWN = "Couldn't reach the citator API — is the backend running on :8080?";
 
 export default function Citator() {
+  const { session } = useAuth();
+  const email = session?.user?.email ?? null;
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -150,19 +154,31 @@ export default function Citator() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-100">
       <div className="mx-auto w-full max-w-7xl px-5 py-8">
-        <header className="mb-6">
-          <h1 className="text-2xl font-semibold tracking-tight text-white">
-            Open Citator — is it still good law?
-          </h1>
-          <p className="mt-1 text-sm text-slate-400">
-            First we <span className="text-slate-200">retrieve</span> every case that cites
-            this one; then we <span className="text-slate-200">analyze</span> how each treats it.
-            Every signal is grounded — click any source to read the passage and follow it. Not
-            legal advice.{" "}
-            <Link href="/assistant" className="text-sky-400 underline-offset-2 hover:underline">
-              Try the assistant →
+        <header className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-white">
+              Open Citator — is it still good law?
+            </h1>
+            <p className="mt-1 text-sm text-slate-400">
+              First we <span className="text-slate-200">retrieve</span> every case that cites
+              this one; then we <span className="text-slate-200">analyze</span> how each treats it.
+              Every signal is grounded — click any source to read the passage and follow it. Not
+              legal advice.{" "}
+              <Link href="/assistant" className="text-sky-400 underline-offset-2 hover:underline">
+                Try the assistant →
+              </Link>
+            </p>
+          </div>
+          {email ? (
+            <AccountMenu email={email} />
+          ) : (
+            <Link
+              href="/"
+              className="shrink-0 rounded-full border border-white/15 px-4 py-1.5 text-sm text-slate-200 transition hover:bg-white/10"
+            >
+              Sign in
             </Link>
-          </p>
+          )}
         </header>
 
         {/* Search + demo chips */}
