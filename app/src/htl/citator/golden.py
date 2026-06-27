@@ -123,3 +123,55 @@ BRUEN_CITATIONS = CitationsResponse(case=_CASE, total=len(_EDGES), edges=_EDGES)
 # Keyed by CL cluster id (== /resolve's case_id). One entry today; the retrieval
 # engine will populate the rest.
 CITATIONS: dict[int, CitationsResponse] = {BRUEN_ID: BRUEN_CITATIONS}
+
+
+# --------------------------------------------------------------------------- #
+# Full opinion text — mocks what retrieval will persist in cl_opinions.plain_text.
+# The deep analyzer (Feature 3) reads this when present (full-text mode) and falls
+# back to the edge's snippet otherwise. Only a couple of citers carry full text, so
+# both modes are exercised. Representative multi-paragraph prose grounded in the
+# real opinions — Rahimi touches several propositions (P2/P2a/P5/P8), so its deep
+# read yields multiple findings; the other citers stay snippet-only.
+#
+# ponytail: keyed by citing case name (the stub's natural key). Swap for a
+# cl_opinions.plain_text lookup by the citing opinion id once retrieval persists it.
+# --------------------------------------------------------------------------- #
+FULL_TEXT: dict[str, str] = {
+    "United States v. Rahimi": (
+        "Section 922(g)(8) of Title 18 prohibits an individual subject to a domestic "
+        "violence restraining order from possessing a firearm. We hold that it does, "
+        "and that the prohibition is consistent with the Nation's historical tradition "
+        "of firearm regulation.\n\n"
+        "Since the founding, our Nation's firearm laws have included provisions "
+        "preventing individuals who threaten physical harm to others from misusing "
+        "firearms. As applied to the facts here, Section 922(g)(8) fits within this "
+        "tradition. When an individual has been found by a court to pose a credible "
+        "threat to the physical safety of another, that individual may be temporarily "
+        "disarmed consistent with the Second Amendment.\n\n"
+        "Some courts have misunderstood the methodology of our recent Second Amendment "
+        "cases. Those precedents were not meant to suggest a law trapped in amber. As "
+        "we explained in Heller, and reiterated in Bruen, the appropriate analysis "
+        "involves considering whether the challenged regulation is consistent with the "
+        "principles that underpin our regulatory tradition. A court must ascertain "
+        "whether the new law is relevantly similar to laws that our tradition is "
+        "understood to permit. Why and how the regulation burdens the right are "
+        "central to this inquiry. A historical regulation need not be a dead ringer "
+        "or a historical twin.\n\n"
+        "Nor does our decision in Bruen require a regulation to be an updated model of "
+        "a historical counterpart. The Fifth Circuit erred in reading Bruen to require "
+        "a 'historical twin' before a modern regulation may stand. That reading is too "
+        "rigid; it would render the Second Amendment a regulatory straightjacket.\n\n"
+        "Finally, the Government's reliance on the view that Rahimi is not 'responsible' "
+        "misunderstands Bruen. 'Responsible' is a vague term, and we do not suggest that "
+        "the Second Amendment is limited to 'responsible' citizens. The dangerousness "
+        "principle, not the label 'law-abiding, responsible,' supplies the relevant "
+        "historical hook. We also reaffirm that the 'presumptively lawful' regulatory "
+        "measures identified in Heller — including longstanding prohibitions on the "
+        "possession of firearms by felons and the mentally ill — remain undisturbed."
+    ),
+}
+
+
+def full_text_for(citing_case_name: str | None) -> str | None:
+    """The persisted full opinion text for a citer, or None (snippet-only)."""
+    return FULL_TEXT.get(citing_case_name or "")
