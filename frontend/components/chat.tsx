@@ -8,6 +8,41 @@
 import { useEffect, useRef, useState } from "react";
 import { chat, type ChatTurn } from "@/lib/api";
 
+// ponytail: tiny markdown for the model's output subset (bold / italic / bullets /
+// paragraphs). Swap for react-markdown if replies ever need tables, links, code.
+function inline(text: string, k: string): React.ReactNode[] {
+  return text.split(/(\*\*\*.+?\*\*\*|\*\*.+?\*\*|\*.+?\*)/g).map((p, i) => {
+    const key = `${k}-${i}`;
+    if (/^\*\*\*.+\*\*\*$/.test(p)) return <strong key={key}><em>{p.slice(3, -3)}</em></strong>;
+    if (/^\*\*.+\*\*$/.test(p)) return <strong key={key}>{p.slice(2, -2)}</strong>;
+    if (/^\*.+\*$/.test(p)) return <em key={key}>{p.slice(1, -1)}</em>;
+    return <span key={key}>{p}</span>;
+  });
+}
+
+function Markdown({ text }: { text: string }) {
+  const blocks: React.ReactNode[] = [];
+  let bullets: string[] = [];
+  const flush = () => {
+    if (!bullets.length) return;
+    const at = blocks.length;
+    blocks.push(
+      <ul key={`ul-${at}`} className="list-disc space-y-1 pl-4">
+        {bullets.map((b, i) => <li key={i}>{inline(b, `li-${at}-${i}`)}</li>)}
+      </ul>,
+    );
+    bullets = [];
+  };
+  for (const line of text.split("\n")) {
+    const m = line.match(/^\s*[*-]\s+(.*)$/);
+    if (m) { bullets.push(m[1]); continue; }
+    flush();
+    if (line.trim()) blocks.push(<p key={`p-${blocks.length}`}>{inline(line, `p-${blocks.length}`)}</p>);
+  }
+  flush();
+  return <div className="space-y-2">{blocks}</div>;
+}
+
 export function Chat({
   caseId,
   starters = [],
@@ -67,9 +102,9 @@ export function Chat({
               </div>
             ) : (
               <div key={i} className="flex justify-start">
-                <p className="max-w-[92%] whitespace-pre-wrap rounded-2xl rounded-bl-sm border border-white/10 bg-white/5 px-4 py-2.5 text-sm leading-relaxed text-slate-200">
-                  {t.content}
-                </p>
+                <div className="max-w-[92%] rounded-2xl rounded-bl-sm border border-white/10 bg-white/5 px-4 py-2.5 text-sm leading-relaxed text-slate-200">
+                  <Markdown text={t.content} />
+                </div>
               </div>
             ),
           )}
