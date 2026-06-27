@@ -20,12 +20,6 @@ import {
   type PropositionsResult, type VerdictResult,
 } from "../../lib/api";
 
-// Starters for the top doctrinal chat — the questions the demo answers best.
-const ASK_STARTERS = [
-  "What is the current test under Bruen?",
-  "How has Rahimi been treated since 2024?",
-];
-
 // Collapse duplicate citing cases (same title) — retrieval can surface one opinion
 // under parallel citations / multiple passages.
 function dedupeByName<T extends { citing_case: { case_name: string | null } }>(xs: T[]): T[] {
@@ -157,19 +151,6 @@ export default function Citator() {
           </div>
         </header>
 
-        {/* TOP: doctrinal chat — ask the source graph anything */}
-        <Card className="border-sky-500/30 bg-sky-500/[0.04] p-6">
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-sky-400" />
-            <H>Ask the citator</H>
-          </div>
-          <p className="mt-1.5 text-sm text-slate-400">
-            How the doctrine stands today, grounded in the citation graph, not from memory.
-          </p>
-          <div className="mt-4">
-            <Chat starters={ASK_STARTERS} placeholder="What is the current test under Bruen?" />
-          </div>
-        </Card>
         {err && <p className="mt-5 text-sm text-red-400">{err}</p>}
         {loading && <p className="mt-5 text-sm text-slate-500">Loading…</p>}
 
