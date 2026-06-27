@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { supabase } from "./supabase";
+import { supabaseOrNull } from "./supabase";
 
 type AuthState = { session: Session | null; loading: boolean };
 
@@ -13,7 +13,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const sb = supabase();
+    const sb = supabaseOrNull();
+    if (!sb) {
+      // No Supabase env (e.g. local citator-only dev) — render signed-out, don't crash.
+      setLoading(false);
+      return;
+    }
     sb.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setLoading(false);
