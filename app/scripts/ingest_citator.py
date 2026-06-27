@@ -28,13 +28,10 @@ from __future__ import annotations
 import argparse
 import asyncio
 import html
-import json
 import os
 import re
-import ssl
 import urllib.error
 import urllib.parse
-import urllib.request
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any, Callable
@@ -42,11 +39,11 @@ from typing import Any, Callable
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from htl.citator.cl_client import cl_get_json
 from htl.db.citator import CitationEdge, ClOpinion
 from htl.db.engine import dispose_engine, get_session_factory
 
 CL_BASE = "https://www.courtlistener.com/api/rest/v4"
-USER_AGENT = "htl-citator/0.1 (hack-the-law-cambridge-2026)"
 
 # "Name|Citation" — the four landmark overrulings we seed the citator with.
 DEFAULT_CASES = [
@@ -58,15 +55,6 @@ DEFAULT_CASES = [
 
 _TAG = re.compile(r"<[^>]+>")
 _FED_APPELLATE = re.compile(r"^(ca\d+|cadc|cafc)$")
-
-# macOS Pythons often lack a system CA bundle; certifi (a transitive dep) is the
-# repo's standard fix (see the justfile's SSL_CERT_FILE dance for alembic).
-try:
-    import certifi
-
-    _SSL_CTX: ssl.SSLContext | None = ssl.create_default_context(cafile=certifi.where())
-except Exception:  # pragma: no cover - certifi always present here
-    _SSL_CTX = None
 
 Search = Callable[[dict[str, Any]], dict[str, Any]]
 
@@ -111,6 +99,10 @@ def court_rank(court_id: str | None) -> int:
     return 2
 
 
+# The binding tier — fetched in full (bounded). Everything else is the sampled tail.
+HIGH_COURTS = ["scotus", "cadc", "cafc", *(f"ca{i}" for i in range(1, 12))]
+
+
 def lead_opinion_id(result: dict[str, Any]) -> int | None:
     ops = result.get("opinions") or []
     return ops[0].get("id") if ops else result.get("cluster_id")
@@ -149,6 +141,71 @@ def opinion_full_text(op: dict[str, Any]) -> str | None:
     return None
 
 
+_GENERIC_PARTY = frozenset(
+    {"inc", "co", "corp", "llc", "ltd", "assn", "of", "the", "et", "al", "ex",
+     "rel", "dept", "department", "commr", "commissioner", "united", "states",
+     "city", "county", "board", "v"}
+)
+
+
+def short_name(case_name: str | None) -> str | None:
+    """The party surname a citing court uses ("…v. Bruen" → "Bruen"). Best-effort:
+    the last alphabetic token after the final 'v.' (or the last token)."""
+    if not case_name:
+        return None
+    tail = re.split(r"\bv\.?\s+", case_name)[-1]
+    tokens = re.findall(r"[A-Za-z][A-Za-z'-]+", tail)
+    return tokens[-1] if tokens else None
+
+
+def party_surnames(case_name: str | None) -> list[str]:
+    """Distinctive surname(s) a court might shorthand a case by — *both* sides, since
+    usage varies ("Roe v. Wade" → "Roe"; "NYSRPA v. Bruen" → "Bruen"). Drops generic
+    org/government tokens so the needle stays distinctive. Used for attribution."""
+    if not case_name:
+        return []
+    out: list[str] = []
+    for part in re.split(r"\bv\.?\s+", case_name):
+        part = re.split(r"\brevision", part.lower())[0]
+        toks = [t for t in re.findall(r"[a-z][a-z'-]+", part) if t not in _GENERIC_PARTY]
+        if toks:
+            out.append(toks[-1])
+    return out
+
+
+def case_key(name: str | None, year: int | None) -> tuple[str, int | None]:
+    """Identity for collapsing CourtListener *revision* clusters of one opinion
+    (defect #3): same case name (sans a 'Revisions: …' suffix) + same year. Three
+    'Wooden v. United States' clusters dated 2022-03-0{7,7,8} collapse to one."""
+    n = (name or "").lower()
+    n = re.split(r"\brevision", n)[0]
+    n = re.sub(r"[^a-z0-9 ]", " ", n)
+    n = re.sub(r"\s+", " ", n).strip()
+    return (n, year)
+
+
+def passage_window(text: str | None, needles: list[str], *, window: int = 1100) -> str | None:
+    """Extract the passage *around* the first mention of the cited authority, so the
+    stored text is the paragraph that treats it — not the whole opinion. Defect #1
+    fix: grounds treatment classification and the displayed receipt. Falls back to
+    the opinion head when no needle is found (still bounded, never the full text)."""
+    if not text:
+        return None
+    lowered = text.lower()
+    pos = -1
+    for n in needles:
+        if not n:
+            continue
+        i = lowered.find(n.lower())
+        if i != -1 and (pos == -1 or i < pos):
+            pos = i
+    if pos == -1:
+        return text[: 2 * window].strip() or None
+    start = max(0, pos - window)
+    end = min(len(text), pos + window)
+    return text[start:end].strip() or None
+
+
 # --------------------------------------------------------------------------- #
 # Collection (live, search-only — pure given a `search` callable).             #
 # --------------------------------------------------------------------------- #
@@ -170,14 +227,21 @@ def resolve_target(search: Search, citation: str) -> dict[str, Any] | None:
     return None
 
 
-def _search_citers(search: Search, op_id: int, citation: str, *,
+def _search_citers(search: Search, op_ids: list[int], *,
                    court: str | None = None, pages: int = 1,
                    order: str = "score desc") -> list[dict[str, Any]]:
+    """Inbound citers via the structured citation graph. Keys on ``cites:(<id>)``
+    over *all* the target's sub-opinion ids (majority + concurrences + dissents) —
+    NOT a literal reporter string. The old ``"597 U.S. 1"`` AND silently dropped
+    every citer that used a parallel reporter or the "597 U. S. 1" spacing (this is
+    how United States v. Rahimi went missing from Bruen). The graph filter is
+    reporter-format-agnostic, so recall is materially higher."""
+    cites = " OR ".join(f"cites:({i})" for i in op_ids)
     out: list[dict[str, Any]] = []
     for page in range(1, pages + 1):
         params: dict[str, Any] = {
             "type": "o",
-            "q": f'cites:({op_id}) "{citation}"',
+            "q": cites,
             "highlight": "on",
             "order_by": order,
             "page": page,
@@ -192,36 +256,69 @@ def _search_citers(search: Search, op_id: int, citation: str, *,
 
 
 def collect_case(search: Search, *, name: str, citation: str,
-                 max_edges: int = 60, max_texts: int = 40,
-                 pages: int = 2) -> CaseData | None:
-    """Resolve a target and gather its inbound graph from the search endpoint."""
+                 max_edges: int = 150, max_texts: int = 40,
+                 pages: int = 3, high_court_pages: int = 5) -> CaseData | None:
+    """Resolve a target and gather its inbound citation graph — **Tier 1**.
+
+    Recall strategy (see docs/citator-fixes-plan.md + the binding-tier model): the
+    *binding* citers (SCOTUS + federal circuits) are the load-bearing treatments
+    and a bounded set, so we fetch them in FULL; the ~10× larger lower-court tail is
+    sampled to ``max_edges`` and the remainder logged — it's the head of a resumable
+    crawl, not a silent cap. (This is the tier where United States v. Rahimi lives;
+    the old single-page + literal-citation search dropped it.)"""
     target_res = resolve_target(search, citation)
     if target_res is None:
         return None
     cited_id = target_res["cluster_id"]
-    op_id = lead_opinion_id(target_res)
+    # All sub-opinion ids (majority + concurrences + dissents), not just the lead —
+    # citers of a concurrence/dissent are otherwise invisible to the graph search.
+    op_ids = [o["id"] for o in (target_res.get("opinions") or []) if o.get("id")] or [
+        lead_opinion_id(target_res)
+    ]
     case = CaseData(target=opinion_row(target_res, source="cl_api", citation=citation))
 
-    # SCOTUS-first (the canonical treatments) then a broader relevance pass.
-    raw = _search_citers(search, op_id, citation, court="scotus", pages=1, order="dateFiled desc")
-    raw += _search_citers(search, op_id, citation, pages=pages, order="score desc")
-
     seen: dict[int, dict[str, Any]] = {}
-    for r in raw:
-        cid = r.get("cluster_id")
-        if cid and cid != cited_id and cid not in seen:
-            seen[cid] = r
 
-    # Prefer higher courts, then most recent, and cap the graph.
-    ranked = sorted(
-        seen.values(),
-        key=lambda r: (court_rank(r.get("court_id")), -_date_ord(r)),
-    )[:max_edges]
+    def _absorb(results: list[dict[str, Any]]) -> None:
+        for r in results:
+            cid = r.get("cluster_id")
+            if cid and cid != cited_id:
+                seen.setdefault(cid, r)
 
-    for i, r in enumerate(ranked):
+    # Tier 1a — high courts in FULL (bounded; this is where binding treatments live).
+    for court in HIGH_COURTS:
+        _absorb(_search_citers(search, op_ids, court=court, pages=high_court_pages,
+                               order="dateFiled desc"))
+    # Tier 1b — a dated sample of the lower-court long tail (the rest is mined later).
+    _absorb(_search_citers(search, op_ids, pages=pages, order="dateFiled desc"))
+
+    # Collapse revision duplicates of the *same* opinion (recall-safe), high courts first.
+    deduped: list[dict[str, Any]] = []
+    seen_keys: set[tuple[str, int | None]] = set()
+    for r in sorted(seen.values(), key=lambda r: (court_rank(r.get("court_id")), -_date_ord(r))):
+        d = parse_date(r.get("dateFiled"))
+        key = case_key(r.get("caseName"), d.year if d else None)
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        deduped.append(r)
+
+    # Keep ALL high courts; cap only the lower-court tail. Never silent (log drops).
+    high = [r for r in deduped if court_rank(r.get("court_id")) < 2]
+    tail = [r for r in deduped if court_rank(r.get("court_id")) == 2]
+    tail_kept = tail[: max(0, max_edges - len(high))]
+    ranked = high + tail_kept
+
+    revision_dupes = len(seen) - len(deduped)
+    if revision_dupes:
+        print(f"    · collapsed {revision_dupes} revision-duplicate cluster(s) for {name}")
+    deferred = len(tail) - len(tail_kept)
+    print(f"    · {len(high)} high-court + {len(tail_kept)} tail citer(s) for {name}"
+          + (f"; {deferred}+ lower-court cites deferred to the background crawl" if deferred else ""))
+
+    for r in ranked:
         cid = r["cluster_id"]
-        plain = result_snippet(r) if i < max_texts else None
-        case.citers.append(opinion_row(r, source="cl_api", plain_text=plain))
+        case.citers.append(opinion_row(r, source="cl_api", plain_text=result_snippet(r)))
         case.edges.append((cid, cited_id, 1))
         opid = lead_opinion_id(r)
         if opid:
@@ -302,25 +399,21 @@ def seed_case(citation: str) -> CaseData | None:
 # --------------------------------------------------------------------------- #
 # HTTP + DB plumbing.                                                          #
 # --------------------------------------------------------------------------- #
-def http_get_json(url: str, *, token: str | None = None, timeout: int = 30) -> dict[str, Any]:
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    if token:
-        req.add_header("Authorization", f"Token {token}")
-    with urllib.request.urlopen(req, timeout=timeout, context=_SSL_CTX) as resp:  # noqa: S310
-        return json.loads(resp.read().decode())
+def http_get_json(url: str, *, token: str | None = None, timeout: int = 30,
+                  retries: int = 4) -> dict[str, Any]:
+    """All CourtListener access goes through the single-flight, globally-paced
+    client (lock + ≥20s spacing + 429 backoff) so concurrent callers can't race
+    the rate limit. See ``htl.citator.cl_client``."""
+    return cl_get_json(url, token=token, timeout=timeout, retries=retries)
 
 
 def make_search(token: str | None, sleep: float) -> Search:
-    """A paced search callable. With a token we pace ≤ 4 req/min (CL free tier)."""
-    import time
-
-    pace = max(sleep, 16.0) if token else sleep
+    """A search callable. Pacing is enforced globally by the paced client, so the
+    ``sleep`` arg is now vestigial (kept for CLI compatibility)."""
 
     def search(params: dict[str, Any]) -> dict[str, Any]:
         url = f"{CL_BASE}/search/?" + urllib.parse.urlencode(params)
-        data = http_get_json(url, token=token)
-        time.sleep(pace)
-        return data
+        return http_get_json(url, token=token)
 
     return search
 
@@ -357,8 +450,14 @@ async def write_case(session: Any, case: CaseData) -> None:
 
 
 async def enrich_full_text(case: CaseData, token: str, max_texts: int, pace: float) -> None:
-    """Token path: upgrade the bounded text subset to full opinion text."""
-    for row in case.citers[:max_texts]:
+    """Token path: upgrade the bounded text subset to the passage *around the cite*
+    pulled from the full opinion (not the whole opinion — see ``passage_window``)."""
+    needles = [n for n in [case.target.get("citation"), *party_surnames(case.target.get("case_name"))]
+               if n]
+    # Enrich the binding set (SCOTUS + circuits) first — that's the passage text the
+    # analysis layer reads; the lower-court tail can be enriched by the background crawl.
+    binding = [row for row in case.citers if court_rank(row.get("court")) < 2]
+    for row in binding[:max_texts]:
         opid = case.opinion_ids.get(row["id"])
         if not opid:
             continue
@@ -367,10 +466,10 @@ async def enrich_full_text(case: CaseData, token: str, max_texts: int, pace: flo
         except urllib.error.HTTPError as e:  # pragma: no cover - network
             print(f"    ! opinion {opid}: HTTP {e.code}")
             continue
-        text = opinion_full_text(data)
-        if text:
-            row["plain_text"] = text
-        await asyncio.sleep(pace)
+        passage = passage_window(opinion_full_text(data), needles)
+        if passage:
+            row["plain_text"] = passage
+        # Pacing is enforced globally by the paced client (no local sleep needed).
 
 
 # --------------------------------------------------------------------------- #
@@ -423,7 +522,7 @@ def _try_collect(search: Search, name: str, citation: str,
     try:
         return collect_case(search, name=name, citation=citation,
                             max_edges=args.max_edges, max_texts=args.max_texts,
-                            pages=args.pages)
+                            pages=args.pages, high_court_pages=args.high_court_pages)
     except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError) as e:
         print(f"  ! live fetch failed for {name}: {e}")
         return None
@@ -433,9 +532,12 @@ def main() -> None:
     p = argparse.ArgumentParser(description="Ingest the open-citator data foundation.")
     p.add_argument("--cases", default=",".join(DEFAULT_CASES),
                    help="comma-separated 'Name|Citation' (default: 4 landmark overrulings)")
-    p.add_argument("--max-edges", type=int, default=60, help="cap inbound edges per case")
-    p.add_argument("--max-texts", type=int, default=40, help="cap stored texts per case")
-    p.add_argument("--pages", type=int, default=2, help="search pages per relevance pass")
+    p.add_argument("--max-edges", type=int, default=150,
+                   help="total edges/case (high courts always kept; caps the tail)")
+    p.add_argument("--max-texts", type=int, default=40, help="passages enriched (binding set)")
+    p.add_argument("--pages", type=int, default=3, help="lower-court tail pages")
+    p.add_argument("--high-court-pages", type=int, default=5,
+                   help="pages per high court (fetched in full)")
     p.add_argument("--sleep", type=float, default=1.5, help="seconds between live requests")
     p.add_argument("--seed", action="store_true", help="offline: use the seeded set only")
     args = p.parse_args()

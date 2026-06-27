@@ -27,7 +27,9 @@ from htl.routes import (
     chat,
     citations,
     classify,
+    graph,
     health,
+    inspect,
     propositions,
     resolve,
     risk,
@@ -87,5 +89,7 @@ app.include_router(triage.router)
 app.include_router(classify.router)
 app.include_router(analyze.router)
 app.include_router(propositions.router)
+app.include_router(graph.router)
+app.include_router(inspect.router)
 app.include_router(ask.router)
 app.include_router(verdict.router)
