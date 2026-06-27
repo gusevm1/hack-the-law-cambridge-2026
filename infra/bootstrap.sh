@@ -8,8 +8,8 @@
 # Idempotent — safe to re-run. After this, run ./infra/deploy.sh.
 set -euo pipefail
 
-PROJECT_ID="${PROJECT_ID:-hack-the-law-cambridge-2026}"
-REGION="${REGION:-europe-west1}"
+# shellcheck source=infra/env.sh
+source "$(dirname "$0")/env.sh"  # PROJECT_ID, REGION — the account/project source of truth
 BILLING_ACCOUNT="${BILLING_ACCOUNT:-}"
 ORG_ID="${ORG_ID:-}"
 CREATE_PROJECT="${CREATE_PROJECT:-0}"

@@ -3,8 +3,8 @@
 # Cloud Build builds app/Dockerfile; no local Docker needed.
 set -euo pipefail
 
-PROJECT_ID="${PROJECT_ID:-hack-the-law-cambridge-2026}"
-REGION="${REGION:-europe-west1}"
+# shellcheck source=infra/env.sh
+source "$(dirname "$0")/env.sh"  # PROJECT_ID, REGION — the account/project source of truth
 SERVICE="${SERVICE:-htl-api}"
 VERTEX_LOCATION="${VERTEX_LOCATION:-global}"
 GEMINI_MODEL="${GEMINI_MODEL:-gemini-2.5-flash}"

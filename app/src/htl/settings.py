@@ -6,7 +6,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env.local", extra="ignore")
 
-    gcp_project: str = "hack-the-law-cambridge-2026"
+    gcp_project: str = "llm-law-cambridge26cbx-522"  # overridden by GCP_PROJECT on Cloud Run
     vertex_location: str = "global"
     gemini_model: str = "gemini-2.5-flash"
     ask_model: str = "gemini-2.5-pro"  # the flagship agentic /ask uses the max model
