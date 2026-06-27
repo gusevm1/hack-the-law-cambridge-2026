@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     # and the live default path need no Claude/MaaS setup. claude_location/maas_location
     # are where the router *would* dispatch those providers (us-central1, not global).
     model_routes: dict[str, str] = {
-        "chat": "gemini-3.5-flash",  # /chat assistant (high volume)
+        "chat": "gemini-2.5-pro",  # /chat — agentic, graph-grounded doctrinal assistant
         "classify": "gemini-3.5-flash",  # F2 snippet treatment labels (high volume)
         "analyze": "gemini-3.1-pro-preview",  # F3 deep full-opinion read — the one Pro task
         "narrative": "gemini-3.5-flash",  # F4 "what changed" prose
@@ -59,11 +59,6 @@ class Settings(BaseSettings):
     # Comma-separated; "*" allows any origin (fine for a hackathon).
     # ponytail: comma-split instead of a JSON-list env to dodge pydantic env-parsing.
     cors_origins: str = "*"
-
-    system_prompt: str = (
-        "You are a helpful legal assistant for the Hack the Law Cambridge 2026 project. "
-        "Answer clearly and reference general legal principles where relevant. "
-    )
 
     @property
     def cors_origin_list(self) -> list[str]:
