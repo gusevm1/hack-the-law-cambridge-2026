@@ -133,6 +133,54 @@ export async function caseGraph(id: number): Promise<GraphResult> {
   return request(`/cases/${id}/graph`);
 }
 
+// --- /cases/{id}/inspect — raw DB dump for the dev inspector ----------------- #
+export type InspectTreatment = {
+  type: string | null;
+  scope: string | null;
+  on_other_grounds: boolean;
+  confidence: number | null;
+  model: string | null;
+  quote: string | null;
+};
+export type InspectEdge = {
+  citing_id: number;
+  case_name: string | null;
+  court: string | null;
+  tier: string;
+  date_filed: string | null;
+  citation: string | null;
+  source: string | null;
+  depth: number | null;
+  has_passage: boolean;
+  passage_chars: number;
+  passage_preview: string | null;
+  treatments: InspectTreatment[];
+  opinion_url: string | null;
+};
+export type InspectResult = {
+  target: {
+    case_id: number;
+    case_name: string | null;
+    court: string | null;
+    date_filed: string | null;
+    citation: string | null;
+    source: string | null;
+    in_db: boolean;
+  };
+  counts: {
+    edges: number;
+    classified: number;
+    unclassified: number;
+    with_passage: number;
+    binding: number;
+  };
+  edges: InspectEdge[];
+};
+
+export async function caseInspect(id: number): Promise<InspectResult> {
+  return request(`/cases/${id}/inspect`);
+}
+
 // --- /ask — agentic citator assistant (public) ------------------------------ #
 // Mirrors app/src/htl/models/api.py AskRequest/AskResponse.
 export type AskResult = {
