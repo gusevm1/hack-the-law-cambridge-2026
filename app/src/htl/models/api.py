@@ -108,3 +108,55 @@ class AskResponse(BaseModel):
     answer: str
     resolved_case: ResolveResponse | None = None
     verdict: RiskResponse | None = None
+
+
+# --- GET /cases/{id}/citations — inbound citation edges (retrieval stub) ----- #
+class Edge(BaseModel):
+    """One retrieved inbound citation. Contract mirrors the (assumed) retrieval
+    engine output: full-text ∪ graph union, deduped by cluster, each edge carrying
+    provenance (``source`` + ``matched_citation`` + ``opinion_url``)."""
+
+    citing_case: CitingCaseRef
+    citation: str | None = None
+    passage: str  # the citing passage / snippet
+    source: str  # "graph" | "fulltext"
+    matched_citation: str | None = None  # which parallel cite matched
+    opinion_url: str | None = None
+
+
+class CitationsResponse(BaseModel):
+    case: CaseRef
+    total: int
+    edges: list[Edge]
+
+
+# --- GET /cases/{id}/triage — deterministic depth-of-analysis tiering -------- #
+class TriageSignals(BaseModel):
+    """The deterministic signals the tier was computed from (auditable)."""
+
+    binding: bool  # citing court binds the target (apex or federal circuit)
+    treatment_kw: list[str]  # treatment-language keywords matched in the passage
+    propositions_engaged: list[str]  # proposition ids (P1..P8) with a phrase hit
+    recency_years: int  # how many years ago the citing opinion was filed
+
+
+class TieredEdge(Edge):
+    """An ``Edge`` tagged with its triage tier. NEVER dropped — noise is
+    surfaced as ``mention``, low-ranked, not hidden."""
+
+    tier: str  # "deep" | "shallow" | "mention"
+    reasons: list[str]
+    signals: TriageSignals
+
+
+class TriageCounts(BaseModel):
+    deep: int
+    shallow: int
+    mention: int
+
+
+class TriageResponse(BaseModel):
+    case: CaseRef
+    total: int
+    counts: TriageCounts
+    edges: list[TieredEdge]
