@@ -46,6 +46,20 @@ migrate:
     export SSL_CERT_FILE="$(uv run python -m certifi)"
     uv run alembic upgrade head
 
+# Load a citator pg_dump (COPY format) into Cloud SQL via the connector — no CL, no
+# psql/proxy. TRUNCATEs + reloads the 3 citator tables. Usage: just load-dump <path>
+load-dump dump:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    source infra/env.sh
+    export INSTANCE_CONNECTION_NAME="${PROJECT_ID}:${REGION}:${DB_INSTANCE:-htl-db}"
+    export DB_USER="${DB_USER:-htl_app}"
+    export DB_NAME="${DB_NAME:-htl}"
+    export DB_PASSWORD="$(gcloud secrets versions access latest --secret=htl-db-password --project="$PROJECT_ID")"
+    cd app
+    export SSL_CERT_FILE="$(uv run python -m certifi)"
+    uv run python scripts/load_dump.py "{{dump}}"
+
 # Build + deploy the API to Cloud Run. Override with PROJECT_ID=... REGION=...
 deploy:
     ./infra/deploy.sh
