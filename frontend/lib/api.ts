@@ -100,6 +100,39 @@ export async function caseRisk(id: number): Promise<RiskResult> {
   return request(`/cases/${id}/risk`);
 }
 
+// --- /cases/{id}/graph — the treatment network (public) --------------------- #
+// Mirrors app/src/htl/models/api.py GraphNode/GraphEdge/GraphResponse.
+export type GraphNode = {
+  case_id: number;
+  case_name: string | null;
+  citation: string | null;
+  court: string | null;
+  date_filed: string | null;
+  is_focal: boolean;
+};
+
+export type GraphEdge = {
+  citing_id: number;
+  cited_id: number;
+  treatment: string | null;
+  polarity: "negative" | "positive" | "neutral";
+  confidence: number | null;
+  quote: string | null;
+  on_other_grounds: boolean;
+  source_url: string | null;
+};
+
+export type GraphResult = {
+  focal: CaseRef;
+  signal: string;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+};
+
+export async function caseGraph(id: number): Promise<GraphResult> {
+  return request(`/cases/${id}/graph`);
+}
+
 // --- /ask — agentic citator assistant (public) ------------------------------ #
 // Mirrors app/src/htl/models/api.py AskRequest/AskResponse.
 export type AskResult = {

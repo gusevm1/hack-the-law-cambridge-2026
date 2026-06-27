@@ -149,6 +149,38 @@ def opinion_full_text(op: dict[str, Any]) -> str | None:
     return None
 
 
+def short_name(case_name: str | None) -> str | None:
+    """The party surname a citing court uses ("…v. Bruen" → "Bruen"). Best-effort:
+    the last alphabetic token after the final 'v.' (or the last token)."""
+    if not case_name:
+        return None
+    tail = re.split(r"\bv\.?\s+", case_name)[-1]
+    tokens = re.findall(r"[A-Za-z][A-Za-z'-]+", tail)
+    return tokens[-1] if tokens else None
+
+
+def passage_window(text: str | None, needles: list[str], *, window: int = 1100) -> str | None:
+    """Extract the passage *around* the first mention of the cited authority, so the
+    stored text is the paragraph that treats it — not the whole opinion. Defect #1
+    fix: grounds treatment classification and the displayed receipt. Falls back to
+    the opinion head when no needle is found (still bounded, never the full text)."""
+    if not text:
+        return None
+    lowered = text.lower()
+    pos = -1
+    for n in needles:
+        if not n:
+            continue
+        i = lowered.find(n.lower())
+        if i != -1 and (pos == -1 or i < pos):
+            pos = i
+    if pos == -1:
+        return text[: 2 * window].strip() or None
+    start = max(0, pos - window)
+    end = min(len(text), pos + window)
+    return text[start:end].strip() or None
+
+
 # --------------------------------------------------------------------------- #
 # Collection (live, search-only — pure given a `search` callable).             #
 # --------------------------------------------------------------------------- #
@@ -357,7 +389,10 @@ async def write_case(session: Any, case: CaseData) -> None:
 
 
 async def enrich_full_text(case: CaseData, token: str, max_texts: int, pace: float) -> None:
-    """Token path: upgrade the bounded text subset to full opinion text."""
+    """Token path: upgrade the bounded text subset to the passage *around the cite*
+    pulled from the full opinion (not the whole opinion — see ``passage_window``)."""
+    needles = [n for n in (case.target.get("citation"), short_name(case.target.get("case_name")))
+               if n]
     for row in case.citers[:max_texts]:
         opid = case.opinion_ids.get(row["id"])
         if not opid:
@@ -367,9 +402,9 @@ async def enrich_full_text(case: CaseData, token: str, max_texts: int, pace: flo
         except urllib.error.HTTPError as e:  # pragma: no cover - network
             print(f"    ! opinion {opid}: HTTP {e.code}")
             continue
-        text = opinion_full_text(data)
-        if text:
-            row["plain_text"] = text
+        passage = passage_window(opinion_full_text(data), needles)
+        if passage:
+            row["plain_text"] = passage
         await asyncio.sleep(pace)
 
 
