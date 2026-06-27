@@ -1,11 +1,11 @@
 "use client";
 
-// Case dossier — a staged workflow:
-//   1. RETRIEVE   pick a case → citation graph + the quick verdict + citing info.
-//   2. ANALYSE    one button → Maxim's analysis (triage · propositions · verdict)
-//                 runs behind a lightweight runner (steps tick off as data lands).
-//   3. FINDINGS   the compiled dashboard: operative rule, how each holding held up,
-//                 treatment depth, grounded treatments, and the use-aware verdict.
+// Case dossier — a staged workflow across TWO views:
+//   NETWORK view  (retrieve/analyse): pick a case → citation graph + quick verdict
+//                 + citing info; "Run analysis" fires Maxim's analysis behind a runner.
+//   FINDINGS view (overview dashboard): a dedicated compiled overview — verdict +
+//                 operative rule, a bento of signals, how each holding held up,
+//                 grounded treatments, and the use-aware verdict.
 // All live: /risk · /graph · /triage · /propositions · /verdict.
 import { useCallback, useEffect, useState } from "react";
 import { CitationGraph } from "../../../components/citation-graph";
@@ -22,11 +22,11 @@ const DEMO = [
   { name: "Emp. Div. v. Smith", id: 112404 },
 ];
 
-const SIG: Record<string, { txt: string; ring: string; glow: string; label: string; dot: string }> = {
-  red: { txt: "text-red-400", ring: "ring-red-500/50", glow: "shadow-red-500/30", label: "No longer good law", dot: "bg-red-500" },
-  amber: { txt: "text-amber-300", ring: "ring-amber-400/50", glow: "shadow-amber-400/30", label: "Good, but eroding", dot: "bg-amber-400" },
-  green: { txt: "text-green-400", ring: "ring-green-500/50", glow: "shadow-green-500/30", label: "Still good law", dot: "bg-green-500" },
-  unknown: { txt: "text-slate-300", ring: "ring-slate-500/40", glow: "shadow-slate-500/20", label: "Unknown", dot: "bg-slate-400" },
+const SIG: Record<string, { txt: string; ring: string; glow: string; label: string; dot: string; chip: string }> = {
+  red: { txt: "text-red-400", ring: "ring-red-500/50", glow: "shadow-red-500/30", label: "No longer good law", dot: "bg-red-500", chip: "bg-red-500/15 text-red-300 ring-red-500/40" },
+  amber: { txt: "text-amber-300", ring: "ring-amber-400/50", glow: "shadow-amber-400/30", label: "Good, but eroding", dot: "bg-amber-400", chip: "bg-amber-400/15 text-amber-200 ring-amber-400/40" },
+  green: { txt: "text-green-400", ring: "ring-green-500/50", glow: "shadow-green-500/30", label: "Still good law", dot: "bg-green-500", chip: "bg-green-500/15 text-green-300 ring-green-500/40" },
+  unknown: { txt: "text-slate-300", ring: "ring-slate-500/40", glow: "shadow-slate-500/20", label: "Unknown", dot: "bg-slate-400", chip: "bg-slate-500/15 text-slate-300 ring-slate-500/30" },
 };
 const sigOf = (s: string) => SIG[s] ?? SIG.unknown;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -120,6 +120,8 @@ export default function Dossier() {
 
   const s = sigOf(risk?.signal ?? "unknown");
   const selNode = sel && graph ? graph.nodes.find((n) => n.case_id === sel.citing_id) : null;
+  const showNetwork = risk && !loading && phase !== "findings";
+  const showFindings = risk && !loading && phase === "findings";
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-100">
@@ -144,9 +146,9 @@ export default function Dossier() {
         {err && <p className="mt-5 text-sm text-red-400">{err}</p>}
         {loading && <p className="mt-5 text-sm text-slate-500">Loading…</p>}
 
-        {risk && !loading && (
+        {/* ════════════════ NETWORK VIEW (retrieve / analysing) ════════════════ */}
+        {showNetwork && (
           <div className="mt-6 space-y-5">
-            {/* VERDICT HERO — the quick read */}
             <Card className={`p-6 ring-1 ${s.ring} shadow-[0_0_60px_-20px] ${s.glow}`}>
               <div className="flex items-center gap-2">
                 <span className={`h-2.5 w-2.5 rounded-full ${s.dot}`} />
@@ -159,7 +161,6 @@ export default function Dossier() {
               {risk.ground_truth.overruled_by && <p className="mt-2 text-xs font-medium text-red-400">Ground truth: overruled by {risk.ground_truth.overruled_by}</p>}
             </Card>
 
-            {/* STATS */}
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               <Card className="p-5">
                 <H>Treatment mix</H>
@@ -172,7 +173,6 @@ export default function Dossier() {
               <Card className="p-5"><H>Erosion over time</H><div className="mt-3"><Sparkline trend={risk.trend} /></div></Card>
             </div>
 
-            {/* GRAPH + EVIDENCE */}
             {graph && (
               <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_340px]">
                 <Card className="relative h-[600px] overflow-hidden">
@@ -205,11 +205,10 @@ export default function Dossier() {
               </div>
             )}
 
-            {/* ── STAGE GATE: run analysis ── */}
             {phase === "retrieve" && (
               <Card className="flex flex-col items-center gap-3 border-dashed p-8 text-center">
                 <H>Deeper analysis</H>
-                <p className="max-w-md text-sm text-slate-400">You&apos;ve got the network and the quick verdict. Run the full analysis to track every holding through time and judge it for your specific use.</p>
+                <p className="max-w-md text-sm text-slate-400">You&apos;ve got the network and the quick verdict. Run the full analysis to compile the findings overview.</p>
                 <button onClick={runAnalysis}
                   className="mt-1 rounded-full bg-sky-500 px-7 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:bg-sky-400">
                   Run analysis →
@@ -217,7 +216,6 @@ export default function Dossier() {
               </Card>
             )}
 
-            {/* ── ANALYSIS RUNNER ── */}
             {phase === "analyzing" && (
               <Card className="p-8">
                 <H>Analysing</H>
@@ -237,98 +235,129 @@ export default function Dossier() {
                 </ul>
               </Card>
             )}
+          </div>
+        )}
 
-            {/* ── FINDINGS DASHBOARD ── */}
-            {phase === "findings" && (
-              <>
-                {props?.operative_rule && (
-                  <Card className={`cmr-fade p-6 ring-1 ${s.ring}`}>
-                    <H>Operative rule</H>
-                    <p className="mt-2 text-xl font-semibold leading-snug text-white">{props.operative_rule}</p>
-                  </Card>
-                )}
+        {/* ════════════════ FINDINGS VIEW (overview dashboard) ════════════════ */}
+        {showFindings && (
+          <div className="mt-6 space-y-5">
+            {/* nav */}
+            <div className="flex items-center gap-3">
+              <button onClick={() => setPhase("retrieve")}
+                className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-300 transition hover:bg-white/10">← Network</button>
+              <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">Findings overview</span>
+            </div>
 
-                {triage && (
-                  <Card className="cmr-fade p-5">
-                    <H>Analysis depth — every citation tiered</H>
+            {/* verdict + operative rule hero */}
+            <Card className={`cmr-fade p-7 ring-1 ${s.ring} shadow-[0_0_70px_-22px] ${s.glow}`}>
+              <div className="flex items-center gap-2">
+                <span className={`h-2.5 w-2.5 rounded-full ${s.dot}`} />
+                <span className={`text-sm font-semibold uppercase tracking-wide ${s.txt}`}>{s.label}</span>
+                <span className="ml-auto text-xs text-slate-500">risk {risk.risk_score.toFixed(2)}</span>
+              </div>
+              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">{risk.case.case_name}</h1>
+              <p className="text-sm text-slate-400">{[risk.case.citation, risk.case.court, risk.case.date_filed].filter(Boolean).join("  ·  ")}</p>
+              {props?.operative_rule && <p className="mt-4 border-l-2 border-white/25 pl-3 text-lg font-semibold leading-snug text-white">{props.operative_rule}</p>}
+              <p className="mt-3 text-sm text-slate-300">{risk.risk_rationale}</p>
+            </Card>
+
+            {/* bento: mix · erosion · depth */}
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+              <Card className="cmr-fade p-5">
+                <H>Treatment mix</H>
+                <div className="mt-3 space-y-1.5 text-sm">
+                  <div className="flex justify-between"><span className="text-slate-400">Negative</span><span className="font-semibold text-red-400">{risk.negative_treatments.length}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Approving</span><span className="font-semibold text-green-400">{risk.positive_signal.approving_cites}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Total citing</span><span className="font-semibold text-white">{risk.positive_signal.total_citing}</span></div>
+                </div>
+              </Card>
+              <Card className="cmr-fade p-5"><H>Erosion over time</H><div className="mt-3"><Sparkline trend={risk.trend} /></div></Card>
+              <Card className="cmr-fade p-5">
+                <H>Analysis depth</H>
+                {triage ? (
+                  <>
                     <div className="mt-3 flex h-3 overflow-hidden rounded-full bg-white/10">
                       <div className="bg-emerald-500" style={{ width: `${(triage.counts.deep / triage.total) * 100}%` }} />
                       <div className="bg-yellow-400" style={{ width: `${(triage.counts.shallow / triage.total) * 100}%` }} />
                       <div className="bg-slate-500" style={{ width: `${(triage.counts.mention / triage.total) * 100}%` }} />
                     </div>
-                    <p className="mt-2 text-xs text-slate-400">{triage.counts.deep} deep · {triage.counts.shallow} shallow · {triage.counts.mention} mention · {triage.total} total</p>
-                  </Card>
-                )}
+                    <p className="mt-2 text-xs text-slate-400">{triage.counts.deep} deep · {triage.counts.shallow} shallow · {triage.counts.mention} mention</p>
+                  </>
+                ) : <p className="mt-3 text-xs text-slate-500">—</p>}
+              </Card>
+            </div>
 
-                {props?.propositions?.length ? (
-                  <Card className="cmr-fade p-5">
-                    <H>How each holding held up</H>
-                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      {props.propositions.map((p) => {
-                        const ps = sigOf(p.signal);
-                        return (
-                          <div key={p.proposition_id} className="rounded-xl border border-white/10 p-3">
-                            <div className="flex items-center gap-2">
-                              <span className={`h-1.5 w-1.5 rounded-full ${ps.dot}`} />
-                              <span className="font-mono text-[11px] text-slate-400">{p.proposition_id}</span>
-                              <span className="text-sm font-medium text-white">{p.label}</span>
-                              <span className={`ml-auto text-[10px] uppercase ${ps.txt}`}>{p.status}</span>
-                            </div>
-                            {p.what_changed && <p className="mt-1.5 text-xs text-slate-400">{p.what_changed}</p>}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </Card>
-                ) : null}
-
-                {risk.negative_treatments.length > 0 && (
-                  <Card className="cmr-fade p-5">
-                    <H>Negative treatments ({risk.negative_treatments.length})</H>
-                    <ul className="mt-3 space-y-3">
-                      {risk.negative_treatments.map((t, i) => (
-                        <li key={i} className="rounded-xl border border-white/10 p-3">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] font-medium text-red-300 ring-1 ring-red-500/40">{t.type}{t.on_other_grounds ? " · other grounds" : ""}</span>
-                            <span className="text-xs text-slate-300">{t.citing_case.case_name}{t.citing_case.date_filed ? ` · ${t.citing_case.date_filed}` : ""}</span>
-                            {t.confidence != null && <span className="ml-auto text-[11px] text-slate-500">{Math.round(t.confidence * 100)}%</span>}
-                          </div>
-                          {t.quote && <p className="mt-2 text-xs italic text-slate-400">“{t.quote}”</p>}
-                        </li>
-                      ))}
-                    </ul>
-                  </Card>
-                )}
-
-                <Card className="cmr-fade border-dashed p-6">
-                  <H>Verdict for your use</H>
-                  <p className="mt-1 text-sm text-slate-400">Tell us the proposition you&apos;d cite it for — we judge the risk for that specific use.</p>
-                  <form onSubmit={getVerdict} className="mt-4 flex gap-2">
-                    <input value={use} onChange={(e) => setUse(e.target.value)}
-                      placeholder={`e.g. cite ${(risk.case.case_name ?? "this").split(" ")[0]} for the public-carry right`}
-                      className="flex-1 rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm outline-none placeholder:text-slate-500 focus:border-white/30" />
-                    <button disabled={vLoading || !use.trim()} className="rounded-full bg-white px-6 text-sm font-medium text-slate-900 transition hover:bg-slate-200 disabled:opacity-40">{vLoading ? "Judging…" : "Get verdict"}</button>
-                  </form>
-                  {verdict && (
-                    <div className="cmr-fade mt-5">
-                      <div className={`flex items-center gap-2 ${verdict.real_risk ? "text-red-400" : "text-green-400"}`}>
-                        <span className={`h-2.5 w-2.5 rounded-full ${verdict.real_risk ? "bg-red-500" : "bg-green-500"}`} />
-                        <span className="text-sm font-semibold uppercase tracking-wide">{verdict.real_risk ? "Risky for this use" : "Safe for this use"}</span>
+            {/* propositions */}
+            {props?.propositions?.length ? (
+              <Card className="cmr-fade p-5">
+                <H>How each holding held up</H>
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {props.propositions.map((p) => {
+                    const ps = sigOf(p.signal);
+                    return (
+                      <div key={p.proposition_id} className="rounded-xl border border-white/10 p-3">
+                        <div className="flex items-center gap-2">
+                          <span className={`h-1.5 w-1.5 rounded-full ${ps.dot}`} />
+                          <span className="font-mono text-[11px] text-slate-400">{p.proposition_id}</span>
+                          <span className="text-sm font-medium text-white">{p.label}</span>
+                          <span className={`ml-auto text-[10px] uppercase ${ps.txt}`}>{p.status}</span>
+                        </div>
+                        {p.what_changed && <p className="mt-1.5 text-xs text-slate-400">{p.what_changed}</p>}
                       </div>
-                      <p className="mt-2 text-sm text-slate-300">{verdict.risk_explanation}</p>
-                      {verdict.close_to_overruled?.flag && <p className="mt-2 text-xs text-red-400">⚠ Close to overruled: {verdict.close_to_overruled.rationale}</p>}
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {verdict.per_proposition.map((p) => (
-                          <span key={p.proposition_id} className={`rounded-full px-2.5 py-1 text-[11px] ring-1 ${sigOf(p.signal).ring} ${sigOf(p.signal).txt}`}>
-                            {p.proposition_id}{p.relevant_to_use ? " ●" : ""} · {p.signal}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })}
+                </div>
+              </Card>
+            ) : null}
+
+            {/* treatments + use-aware verdict */}
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+              {risk.negative_treatments.length > 0 && (
+                <Card className="cmr-fade p-5">
+                  <H>Negative treatments ({risk.negative_treatments.length})</H>
+                  <ul className="mt-3 space-y-3">
+                    {risk.negative_treatments.map((t, i) => (
+                      <li key={i} className="rounded-xl border border-white/10 p-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] font-medium text-red-300 ring-1 ring-red-500/40">{t.type}{t.on_other_grounds ? " · other grounds" : ""}</span>
+                          <span className="text-xs text-slate-300">{t.citing_case.case_name}{t.citing_case.date_filed ? ` · ${t.citing_case.date_filed}` : ""}</span>
+                          {t.confidence != null && <span className="ml-auto text-[11px] text-slate-500">{Math.round(t.confidence * 100)}%</span>}
+                        </div>
+                        {t.quote && <p className="mt-2 text-xs italic text-slate-400">“{t.quote}”</p>}
+                      </li>
+                    ))}
+                  </ul>
                 </Card>
-              </>
-            )}
+              )}
+
+              <Card className="cmr-fade border-dashed p-6">
+                <H>Verdict for your use</H>
+                <p className="mt-1 text-sm text-slate-400">Tell us the proposition you&apos;d cite it for — we judge the risk for that specific use.</p>
+                <form onSubmit={getVerdict} className="mt-4 flex gap-2">
+                  <input value={use} onChange={(e) => setUse(e.target.value)}
+                    placeholder={`e.g. cite ${(risk.case.case_name ?? "this").split(" ")[0]} for…`}
+                    className="flex-1 rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm outline-none placeholder:text-slate-500 focus:border-white/30" />
+                  <button disabled={vLoading || !use.trim()} className="rounded-full bg-white px-5 text-sm font-medium text-slate-900 transition hover:bg-slate-200 disabled:opacity-40">{vLoading ? "…" : "Judge"}</button>
+                </form>
+                {verdict && (
+                  <div className="cmr-fade mt-5">
+                    <div className={`flex items-center gap-2 ${verdict.real_risk ? "text-red-400" : "text-green-400"}`}>
+                      <span className={`h-2.5 w-2.5 rounded-full ${verdict.real_risk ? "bg-red-500" : "bg-green-500"}`} />
+                      <span className="text-sm font-semibold uppercase tracking-wide">{verdict.real_risk ? "Risky for this use" : "Safe for this use"}</span>
+                    </div>
+                    <p className="mt-2 text-sm text-slate-300">{verdict.risk_explanation}</p>
+                    {verdict.close_to_overruled?.flag && <p className="mt-2 text-xs text-red-400">⚠ Close to overruled: {verdict.close_to_overruled.rationale}</p>}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {verdict.per_proposition.map((p) => (
+                        <span key={p.proposition_id} className={`rounded-full px-2.5 py-1 text-[11px] ring-1 ${sigOf(p.signal).ring} ${sigOf(p.signal).txt}`}>
+                          {p.proposition_id}{p.relevant_to_use ? " ●" : ""} · {p.signal}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </Card>
+            </div>
           </div>
         )}
       </div>
