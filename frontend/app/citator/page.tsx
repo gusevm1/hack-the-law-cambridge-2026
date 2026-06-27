@@ -171,12 +171,6 @@ export default function Citator() {
             className="flex-1 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm outline-none placeholder:text-slate-500 focus:border-white/30" />
           <button disabled={loading || !query.trim()} className="rounded-full bg-white px-6 text-sm font-medium text-slate-900 transition hover:bg-slate-200 disabled:opacity-40">Check</button>
         </form>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {DEMO.map((c) => (
-            <button key={c.id} onClick={() => load(c.id)} disabled={loading}
-              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300 transition hover:bg-white/10 disabled:opacity-40">{c.name}</button>
-          ))}
-        </div>
         {err && <p className="mt-5 text-sm text-red-400">{err}</p>}
         {loading && <p className="mt-5 text-sm text-slate-500">Loading…</p>}
 
