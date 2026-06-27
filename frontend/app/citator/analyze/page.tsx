@@ -16,6 +16,7 @@ import {
   type ClassifyResult,
   type ClassifiedEdge,
 } from "@/lib/api";
+import VerdictStep from "./steps/verdict";
 
 const BRUEN_ID = 6480696;
 const API_DOWN = "Couldn't reach the citator API — is `just dev-api` running?";
@@ -183,12 +184,7 @@ export default function Analyze() {
               body="Feature 3 — buckets edges by proposition and chains the foundation/refinement authorities (Heller → McDonald → Bruen → Rahimi)."
             />
           )}
-          {step === 4 && (
-            <Placeholder
-              title="Verdict"
-              body="Feature 4/5 — per-proposition signed risk → the composed operative rule: “Bruen, good law as modified by Rahimi (2024).”"
-            />
-          )}
+          {step === 4 && <VerdictStep caseId={data.case.case_id} active={step === 4} />}
 
           {/* Nav */}
           <div className="mt-8 flex justify-between">
