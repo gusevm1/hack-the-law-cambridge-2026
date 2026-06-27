@@ -641,7 +641,7 @@
     .summary-cell { color: hsl(var(--muted-foreground)); max-width: 380px; }
 
     .graph-frame {
-      height: 430px;
+      height: 560px;
       overflow: auto;
       position: relative;
       max-width: 100%;
@@ -837,7 +837,10 @@
     // Assemble Stef's case object from /cases/{id}/risk + /graph (real citator data).
     async function loadCase(id) {
       if (DATA[id]) return DATA[id];
-      const [risk, graph] = await Promise.all([jget(`/cases/${id}/risk`), jget(`/cases/${id}/graph`)]);
+      const [risk, graph, triage, props] = await Promise.all([
+        jget(`/cases/${id}/risk`), jget(`/cases/${id}/graph`),
+        jget(`/cases/${id}/triage`).catch(() => null), jget(`/cases/${id}/propositions`).catch(() => null),
+      ]);
       const meta = Object.fromEntries(graph.nodes.map((n) => [String(n.case_id), n]));
       const pol = { positive: 0, negative: 0, neutral: 0 };
       const bd = {};
@@ -879,6 +882,9 @@
             treatment: e.treatment || "cited-neutral", weight: (TREAT[e.treatment] && TREAT[e.treatment].weight) || 0 })),
         },
       };
+      c.triage = triage;
+      c.propositions = (props && props.propositions) || [];
+      c.operativeRule = (props && props.operative_rule) || "";
       DATA[id] = c; return c;
     }
 
@@ -892,16 +898,11 @@
       sort: "treatmentWeight",
       desc: true,
       verdictOpen: false,
+      use: "",
+      verdict: null,
+      verdictLoading: false,
       expanded: { root: true, incoming: true, cited: true, subjects: true }
     };
-
-    const items = [
-      { id: "1", region: "North America", sales: 1200, revenue: 25000, growth: 12 },
-      { id: "2", region: "Europe", sales: 900, revenue: 18000, growth: -5 },
-      { id: "3", region: "Asia", sales: 1500, revenue: 30000, growth: 20 },
-      { id: "4", region: "South America", sales: 600, revenue: 10000, growth: 8 },
-      { id: "5", region: "Africa", sales: 400, revenue: 7000, growth: -3 }
-    ];
 
     const app = document.getElementById("app");
     const fmt = n => Number(n).toLocaleString();
@@ -997,6 +998,7 @@
     function dashboardPage() {
       const c = current();
       if (!c) return `<main class="shell"><p class="muted" style="padding:48px 4px">Loading case…</p></main>`;
+      const s = sig(c);
       return `
         <main class="shell">
           <section class="case-hero">
@@ -1004,7 +1006,7 @@
               <div class="card-header">
                 <div class="case-title-row">
                   <div>
-                    <span class="eyebrow"><i data-lucide="file-search" width="14" height="14"></i> Case review started</span>
+                    <span class="eyebrow" style="color:${s.color};border-color:${s.color}"><i data-lucide="${s.icon}" width="14" height="14"></i> ${esc(s.label)}</span>
                     <h1 class="case-title">${esc(c.caseName)}</h1>
                   </div>
                   <button class="btn btn-outline" data-action="home"><i data-lucide="arrow-left" width="14" height="14"></i> New search</button>
@@ -1013,30 +1015,26 @@
                   <span class="mono">${esc(c.citation)}</span>
                   <span>${esc(c.court)}</span>
                   <span class="mono">${esc(c.year)}</span>
-                  <span>${esc(c.subjects.join(" / "))}</span>
+                  <span><strong>${c.totalCiting}</strong> citing &middot; <strong style="color:hsl(var(--danger))">${c.negative}</strong> negative &middot; <strong style="color:hsl(var(--good))">${c.positive}</strong> approving</span>
                 </div>
               </div>
               <div class="review-steps">
-                ${step(1, "Evidence mix")}
-                ${step(2, "Authority tree")}
-                ${step(3, "Citation graph")}
-                ${step(4, "Final step")}
+                ${step(1, "Graph")}
+                ${step(2, "Evidence")}
+                ${step(3, "Authorities")}
+                ${step(4, "Verdict")}
               </div>
             </div>
           </section>
 
-          <div class="review-grid">
-            <div class="stack">
-              ${evidenceCard(c)}
-              ${InlineAnalyticsTable()}
-              ${tableCard(c)}
-              ${graphCard(c)}
-            </div>
-            <aside class="stack">
-              ${authorityTreeCard(c)}
-              ${riskFactorsCard(c)}
-            </aside>
+          ${graphCard(c)}
+          ${evidenceCard(c)}
+
+          <div class="review-grid" style="margin-top:16px">
+            <div class="stack">${tableCard(c)}</div>
+            <aside class="stack">${riskFactorsCard(c)}</aside>
           </div>
+          ${analyzeSection(c)}
           <div style="margin-top:16px">${decisionCard(c)}</div>
         </main>`;
     }
@@ -1078,58 +1076,6 @@
       return `<span class="trend-icon ${growth >= 0 ? "positive" : "negative"}"><i data-lucide="${growth >= 0 ? "trending-up" : "trending-down"}" width="16" height="16"></i></span>`;
     }
 
-    function InlineAnalyticsTable() {
-      const totalRevenue = items.reduce((acc, cur) => acc + cur.revenue, 0);
-      return `
-        <section class="card">
-          <div class="inline-analytics-shell">
-            <table class="inline-analytics-table">
-              <thead>
-                <tr>
-                  <th style="width:25%">Region</th>
-                  <th style="width:20%">
-                    <div class="analytics-head">
-                      <span>Sales</span>
-                      <span class="header-progress"><span style="width:70%"></span></span>
-                    </div>
-                  </th>
-                  <th style="width:20%">
-                    <div class="analytics-head">
-                      <span>Revenue</span>
-                      <span class="header-progress"><span style="width:60%"></span></span>
-                    </div>
-                  </th>
-                  <th style="width:20%">
-                    <div class="analytics-head">
-                      <span>Growth</span>
-                      <span class="header-progress"><span style="width:50%"></span></span>
-                    </div>
-                  </th>
-                  <th style="width:15%">Trend</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${items.map(item => `
-                  <tr>
-                    <td class="font-medium">${esc(item.region)}</td>
-                    <td>${item.sales}</td>
-                    <td>$${item.revenue.toLocaleString()}</td>
-                    <td>${item.growth}%</td>
-                    <td class="trend-cell">${GrowthIcon(item.growth)}</td>
-                  </tr>`).join("")}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td colspan="2">Total</td>
-                  <td>$${totalRevenue.toLocaleString()}</td>
-                  <td colspan="2"></td>
-                </tr>
-              </tfoot>
-            </table>
-            <p class="inline-analytics-caption">Wide Inline Analytics Table with balanced spacing</p>
-          </div>
-        </section>`;
-    }
 
     function authorityTreeCard(c) {
       const incoming = c.authorities.map((a, index) => ({ id: "auth-" + index, label: a.caseName, meta: `${a.year} · ${TREAT[a.treatment].label}`, icon: a.treatmentWeight < 0 ? "file-warning" : "file-check" }));
@@ -1174,16 +1120,20 @@
     }
 
     function riskFactorsCard(c) {
+      const notes = [];
+      if (c.overruledBy) notes.push({ label: "Overruled", detail: "Superseded by " + c.overruledBy + " — do not cite for the broad proposition." });
+      const worst = (c.authorities || [])[0];
+      if (worst && (TREAT[worst.treatment]?.weight ?? 0) < 0)
+        notes.push({ label: TREAT[worst.treatment].label + " · " + worst.caseName, detail: worst.summary || (worst.court + " " + worst.year) });
+      notes.push({ label: "Treatment mix", detail: c.negative + " negative · " + c.positive + " approving · " + c.neutral + " neutral, across " + c.totalCiting + " citing." });
+      const t = (c.trend || [])[c.trend.length - 1];
+      if (t) notes.push({ label: "Latest trend · " + t.year, detail: Math.round(t.negShare * 100) + "% of that year's treatments were negative." });
       return `
         <section class="card">
-          <div class="section-head">
-            <div><h2>Review notes</h2><p>These are evidence prompts, not the final verdict.</p></div>
-          </div>
-          <div class="card-content">
-            <ul class="finding-list">
-              ${c.risks.map(r => `<li><strong>${esc(r.label)}</strong><p>${esc(r.detail)}</p></li>`).join("")}
-            </ul>
-          </div>
+          <div class="section-head"><div><h2>Review notes</h2><p>Derived from the record — not the verdict.</p></div></div>
+          <div class="card-content"><ul class="finding-list">
+            ${notes.map(r => `<li><strong>${esc(r.label)}</strong><p>${esc(r.detail)}</p></li>`).join("")}
+          </ul></div>
         </section>`;
     }
 
@@ -1288,7 +1238,65 @@
       return { width, height, nodes: visualNodes, edges: visualEdges };
     }
 
+    function analyzeSection(c) {
+      if (!c.triage && !c.propositions.length && !c.operativeRule) return "";
+      const s = sig(c);
+      const t = c.triage;
+      const tot = (t && t.total) || 1;
+      const seg = (n, col) => `<div style="width:${Math.max((n / tot) * 100, 0)}%;background:${col}"></div>`;
+      const funnel = t ? `
+        <section class="card">
+          <div class="section-head"><div><h2>Depth of treatment</h2><p>Every citation tiered — nothing dropped.</p></div><span class="count-badge">${t.total} citing</span></div>
+          <div class="card-content">
+            <div style="display:flex;height:12px;border-radius:999px;overflow:hidden;background:hsl(var(--muted))">
+              ${seg(t.counts.deep, "hsl(var(--good))")}${seg(t.counts.shallow, "hsl(var(--warning))")}${seg(t.counts.mention, "hsl(var(--grey-wash))")}
+            </div>
+            <div style="display:flex;gap:18px;margin-top:10px;font-size:12px;color:hsl(var(--muted-foreground))">
+              <span><strong style="color:hsl(var(--foreground))">${t.counts.deep}</strong> deep</span>
+              <span><strong style="color:hsl(var(--foreground))">${t.counts.shallow}</strong> shallow</span>
+              <span><strong style="color:hsl(var(--foreground))">${t.counts.mention}</strong> mention</span>
+            </div>
+          </div>
+        </section>` : "";
+      const props = c.propositions.length ? `
+        <section class="card">
+          <div class="section-head"><div><h2>How each holding held up</h2><p>The case's propositions, tracked one by one.</p></div></div>
+          <div class="card-content"><div style="display:grid;gap:8px">
+            ${c.propositions.map(p => `<div style="display:flex;gap:10px;align-items:flex-start;border:1px solid hsl(var(--border));border-radius:8px;padding:10px">
+              <span class="tag mono">${esc(p.proposition_id)}</span>
+              <div style="min-width:0"><p style="margin:0;font-size:13px;font-weight:600">${esc(p.label || "")}</p>
+              <p style="margin:2px 0 0;font-size:12px;color:hsl(var(--muted-foreground))">${esc(p.summary || "")}</p></div></div>`).join("")}
+          </div></div>
+        </section>` : "";
+      const rule = c.operativeRule ? `
+        <section class="card" style="border-color:${s.color}">
+          <div class="card-content" style="padding:18px 20px;display:flex;gap:14px;align-items:center">
+            <span class="verdict-icon" style="background:${s.bg};color:${s.color};width:40px;height:40px;flex:0 0 40px"><i data-lucide="${s.icon}" width="20" height="20"></i></span>
+            <div style="min-width:0"><p style="margin:0;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:hsl(var(--muted-foreground))">Operative rule</p>
+            <p style="margin:4px 0 0;font-size:16px;font-weight:650;line-height:1.3">${esc(c.operativeRule)}</p></div>
+          </div>
+        </section>` : "";
+      return `<div style="margin-top:24px"><div class="section-head" style="border:0;padding:0 4px 12px"><div><h2 style="font-size:18px">Analysis</h2><p>Treatment depth, the holdings tracked one by one, and the operative rule.</p></div></div>
+        <div class="stack">${rule}${funnel}${props}</div></div>`;
+    }
+
     function decisionCard(c) {
+      return `
+        <section id="decision" class="card decision-card" style="margin-top:24px">
+          <div class="card-header">
+            <span class="eyebrow"><i data-lucide="gavel" width="14" height="14"></i> Verdict for your use</span>
+            <h2 class="card-title" style="margin-top:12px">Is it good law for how you'll use it?</h2>
+            <p class="reveal-note">Tell us the proposition you'd cite it for — we judge the risk for that specific use, not in the abstract.</p>
+            <form class="search-row" data-action="check-use" style="margin-top:16px">
+              <div class="input-wrap"><i data-lucide="scale" width="16" height="16"></i>
+                <input id="useInput" value="${esc(state.use || "")}" placeholder="e.g. cite ${esc(c.short)} for the public-carry right" /></div>
+              <button class="btn btn-primary btn-large" type="submit" ${state.verdictLoading ? "disabled" : ""}>${state.verdictLoading ? "Judging…" : "Get verdict"}</button>
+            </form>
+          </div>
+        </section>`;
+    }
+
+    function __OLD_decisionCard(c) {
       return `
         <section id="decision" class="card decision-card">
           <div class="card-header decision-layout">
@@ -1302,7 +1310,34 @@
         </section>`;
     }
 
-    function verdictDialog(c) {
+    function verdictDialog() {
+      const v = state.verdict;
+      if (!v) return "";
+      const safe = v.real_risk === false;
+      const col = safe ? "hsl(var(--good))" : "hsl(var(--danger))";
+      const bg = safe ? "hsl(var(--good-bg))" : "hsl(var(--danger-bg))";
+      const icon = safe ? "shield-check" : "octagon-alert";
+      const pp = (v.per_proposition || []).map(p => `<li><strong>${esc(p.proposition_id)} · ${esc((SIG[p.signal] || {}).label || p.signal)}${p.relevant_to_use ? " · relevant to your use" : ""}</strong><p>${esc(p.note || "")}</p></li>`).join("");
+      return `
+        <div class="dialog-overlay" data-action="close"></div>
+        <section class="dialog-content" role="dialog" aria-modal="true">
+          <button class="dialog-close" data-action="close" aria-label="Close"><i data-lucide="x" width="16" height="16"></i></button>
+          <div><h2 class="dialog-title">Verdict for your use</h2><p class="dialog-description">${esc((v.use && v.use.use_label) || "")}</p></div>
+          <div class="verdict-status" style="border-color:${col};background:${bg}">
+            <span class="verdict-icon" style="background:hsl(var(--background) / .72);color:${col}"><i data-lucide="${icon}" width="24" height="24"></i></span>
+            <div style="min-width:0;flex:1">
+              <div style="font-size:12px;font-weight:700;text-transform:uppercase;color:${col};letter-spacing:.08em">${safe ? "Safe for this use" : "Risky for this use"}</div>
+              <div style="margin-top:5px;font-size:17px;font-weight:720;line-height:1.25">${esc(v.operative_rule || "")}</div>
+            </div>
+          </div>
+          <p class="dialog-description" style="color:hsl(var(--foreground))">${esc(v.risk_explanation || "")}</p>
+          ${v.close_to_overruled && v.close_to_overruled.flag ? `<div class="card" style="padding:12px;border-color:hsl(var(--danger))"><strong style="font-size:12px;color:hsl(var(--danger))">Close to overruled</strong><p class="dialog-description">${esc(v.close_to_overruled.rationale || "")}</p></div>` : ""}
+          <div><h3 style="margin:0 0 8px;font-size:13px">Per-proposition</h3><ul class="finding-list">${pp || "<li><p>—</p></li>"}</ul></div>
+          <div class="card-footer" style="padding:0;justify-content:flex-end"><button class="btn btn-primary" data-action="close">Done</button></div>
+        </section>`;
+    }
+
+    function __OLD_verdictDialog(c) {
       const s = sig(c);
       const risk = Math.round(c.riskScore * 100);
       const neg = c.negTreatments.length ? c.negTreatments.map(n => `<li><strong>${esc(TREAT[n.type].label)} · ${esc(n.caseName)} (${Math.round(n.conf * 100)}% confidence)</strong><p>${esc(n.quote)}</p></li>`).join("") : `<li><strong>No significant negative treatments</strong><p>No dispositive negative treatment was found in this demo record.</p></li>`;
@@ -1371,11 +1406,30 @@
     });
 
     document.addEventListener("submit", async event => {
+      if (event.target.matches("[data-action='check-use']")) {
+        event.preventDefault();
+        const use = document.getElementById("useInput").value.trim();
+        if (!use || state.verdictLoading) return;
+        state.use = use; state.verdictLoading = true; render();
+        try {
+          state.verdict = await fetch(API + `/cases/${state.caseId}/verdict`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ use }) }).then(r => r.json());
+          state.verdictOpen = true;
+        } catch (e) { console.error(e); }
+        state.verdictLoading = false; render();
+        return;
+      }
       if (!event.target.matches("[data-action='search']")) return;
       event.preventDefault();
       const q = document.getElementById("searchInput").value.trim().toLowerCase();
       state.query = q;
-      const id = Object.keys(CASES).find(k => CASES[k].toLowerCase().includes(q) || k === q) || "6480696";
+      let id = Object.keys(CASES).find(k => CASES[k].toLowerCase().includes(q) || k === q);
+      if (!id) {
+        try {
+          const rr = await fetch(API + "/resolve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: document.getElementById("searchInput").value.trim() }) }).then(r => r.json());
+          if (rr.found && rr.case_id != null) { id = String(rr.case_id); CASES[id] = rr.case_name || id; }
+        } catch (e) { console.error(e); }
+      }
+      if (!id) return;
       state.caseId = id; state.screen = "result"; render();
       if (!DATA[id]) { try { await loadCase(id); } catch (e) { console.error(e); } render(); }
     });
