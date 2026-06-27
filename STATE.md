@@ -14,9 +14,10 @@ Where the project is right now. Update this as reality moves.
 - **Vercel:** `https://hack-the-law-cambridge-2026.vercel.app` (live, `main` auto-deploys). `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` set in Production. ✅ `NEXT_PUBLIC_API_URL` is correct — Production builds against `https://htl-api-4h4hpkfmqq-ew.a.run.app` (verified in the live bundle 2026-06-27).
 - **Supabase** (auth-only): project `hack-the-law-cambridge-2026`, ref `seowjktpscgkklvmlvep` (London), ES256/JWKS. Persists across the GCP account switch.
 
-## Open citator (live: /resolve + /cases/{id}/{risk,citations,triage,classify})
-- **Proposition-level pipeline — Features 1 (Filter) + 2 (Classify) SHIPPED +
-  DEPLOYED** (PRs #26, #27). The aligned spec is
+## Open citator (live: /resolve + /cases/{id}/{risk,citations,triage,classify,analyze,propositions})
+- **Proposition-level pipeline — Features 1 (Filter) + 2 (Classify) + 3 (Deep
+  analyzer / A) + 4 (Propositions / B) SHIPPED + DEPLOYED** (PRs #26, #27, #35, #36;
+  prod revision `htl-api-00004-tjz`, real Gemini via the runtime SA). The aligned spec is
   `.claude/handoffs/citator-pipeline-scope.md` (vision → retrieval contract →
   proposition spine P1–P8 → Bruen golden example → per-feature roadmap).
   - **F1 Filter** — `citator/triage.py::tier_edges` (pure, mirrors `risk.py`) tiers
@@ -30,16 +31,32 @@ Where the project is right now. Update this as reality moves.
     amber" trap) · verbatim quote · confidence. `llm/classify.py::classify_edge`
     (Vertex + quote-verify; keyword fallback). Live Gemini: Rahimi→limited/P2a,
     Antonyuk→followed/P1, §922(g)→P5, Wolford→P3.
+  - **F3 Deep analyzer (A)** — `GET /cases/{id}/analyze` triages then deep-reads
+    **only deep+shallow** edges into per-proposition **findings** (one case → many
+    propositions): treatment · what_changed · holding/dicta · attribution · verbatim
+    quote · conf + a one-line `case_summary`. Graceful degradation: **full-text mode**
+    (one schema-constrained read locating+classifying+compiling across the whole
+    opinion) when retrieval persisted the text, else **snippet mode** (reuses
+    `classify_edge`, lower conf); `analysis_depth` records which. `llm/analyze.py`;
+    full text mocked in `golden.full_text_for` (swap for `cl_opinions.plain_text` by
+    citing id). Live: Rahimi→full-text 3 findings (P2a limited · P5 followed · P8
+    followed), the rest snippet. **Supersedes /classify's depth** (kept as the snippet
+    path). Contract A.
+  - **F4 Propositions (B)** — `GET /cases/{id}/propositions` aggregates findings per
+    proposition → signed risk + evolution + trajectory + the composed **operative
+    rule**. Live Bruen: "good law as modified by Rahimi (2024)"; P1/P2 green,
+    P2a/P3/P4/P5 amber. Contract B.
   - Proposition spine is one source of truth: `citator/propositions.py`.
   - All endpoints public, DB-independent. Frontend `/citator/analyze` is the
-    pipeline **stepper**: Resolve → Citations → Treatment (all live) → Relation →
-    Verdict (placeholders for Features 3–5). Grouped by proposition throughout.
+    pipeline **stepper**: Resolve → Citations → Treatment → Relation (all live) →
+    Verdict (placeholder for Feature 5). Grouped by proposition throughout.
   - **Retrieval engineer's ingestion contract:**
     `.claude/handoffs/retrieval-ingestion-contract.md` (wire shape + the per-edge
     `passage` column to add on `citation_edges`).
-- **Next pipeline features** (each its own PR, consume the prior stage): 3 Relate
-  (bucket by proposition; foundation/refinement chain) · 4 Aggregate (per-proposition
-  signed risk → operative rule) · 5 Synthesize (grounded rationale).
+- **Next pipeline feature** (its own PR, consumes the prior stage): **5 Verdict (C)**
+  — use-aware: `POST /cases/{id}/verdict` maps the lawyer's intended use → the
+  propositions it depends on, intersects with the compromised ones → risk *for this
+  use* (Contract C). Features 3 Relate + 4 Aggregate shipped above.
 - **Tables** (migration `0002_citator`): `cl_opinions` (CL id PK, case_name, court, date_filed, citation, plain_text, source), `citation_edges` (composite PK citing_id+cited_id, depth), `treatments` (empty — a later agent classifies passages into it). Models in `app/src/htl/db/citator.py`.
 - **Ingestion**: `cd app && uv run python scripts/ingest_citator.py` (idempotent upserts; `--seed` for an offline real-overrulings fallback). **No CL token needed** — uses the CourtListener v4 **search** endpoint (`q=cites:(<op_id>) "<cite>"&highlight=on`), which returns the inbound graph + a citing-passage snippet stored as `plain_text`. A `COURTLISTENER_TOKEN` only adds optional full-text enrichment (paced ≤4/min via `/opinions/<id>/`).
 - **Seeded the 4 LoC "Decisions Overruled" targets**: Roe (108713), Plessy (94508), Bowers (111738), Lochner (96276). Live run: 150 `cl_opinions`, 157 `citation_edges`, all `source=cl_api`; snippets carry real treatment language (e.g. a Roe citer: "...overruled Casey and Roe v. Wade... See Dobbs").
