@@ -19,15 +19,16 @@ from datetime import date
 from fastapi import APIRouter
 
 from htl.citator import golden
+from htl.citator.retrieval import load_citations
 from htl.citator.triage import tier_edges
 from htl.llm.analyze import EdgeAnalysis, analyze_edge
 from htl.models.api import (
     AnalyzedEdge,
     AnalyzeResponse,
-    CaseRef,
     PropositionFinding,
     TieredEdge,
 )
+from htl.routes.dependencies import DbSession
 
 router = APIRouter()
 
@@ -48,19 +49,20 @@ def _to_edge(e: TieredEdge, a: EdgeAnalysis | None) -> AnalyzedEdge:
 
 
 @router.get("/cases/{case_id}/analyze", response_model=AnalyzeResponse)
-async def case_analyze(case_id: int) -> AnalyzeResponse:
-    hit = golden.CITATIONS.get(case_id)
-    case = hit.case if hit is not None else CaseRef(case_id=case_id)
-    edges = hit.edges if hit is not None else []
-    triage = tier_edges(case, edges, today=date.today())
+async def case_analyze(case_id: int, session: DbSession) -> AnalyzeResponse:
+    cites = await load_citations(session, case_id)
+    case = cites.case
+    triage = tier_edges(case, cites.edges, today=date.today())
 
     async def _maybe(e: TieredEdge) -> EdgeAnalysis | None:
         if e.tier not in _ANALYZE_TIERS:
             return None
-        # ponytail: golden.full_text_for mocks the cl_opinions.plain_text lookup the
-        # retrieval engine will persist (keyed by citing opinion id). Swap that seam,
-        # not this route, when the real data lands.
-        return await analyze_edge(e, case, golden.full_text_for(e.citing_case.case_name))
+        # Full opinion text when golden persisted it (rich, multi-proposition read),
+        # else the DB-stored passage span — analyze_edge lowers to snippet depth when
+        # it's only the window. ponytail: when retrieval persists full text per citing
+        # id, read it here by id; the golden map stays the offline-demo enrichment.
+        text = golden.full_text_for(e.citing_case.case_name) or e.passage
+        return await analyze_edge(e, case, text)
 
     results = await asyncio.gather(*[_maybe(e) for e in triage.edges])
 
