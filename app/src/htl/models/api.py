@@ -34,6 +34,12 @@ class ResolveResponse(BaseModel):
     ambiguous: bool = False
 
 
+# --- POST /ask — agentic citator-aware assistant ---------------------------- #
+class AskRequest(BaseModel):
+    case: str = Field(min_length=1)  # free-form case text (name and/or citation)
+    use: str = Field(min_length=1)  # how the litigator intends to use it in court
+
+
 # --- GET /cases/{id}/risk --------------------------------------------------- #
 class CaseRef(BaseModel):
     case_id: int
@@ -92,3 +98,13 @@ class RiskResponse(BaseModel):
     negative_treatments: list[NegativeTreatment]
     positive_signal: PositiveSignal
     ground_truth: GroundTruth
+
+
+class AskResponse(BaseModel):
+    """Agentic /ask result: the grounded prose answer plus the *real* citator data
+    the agent pulled (resolve + risk), so the frontend renders the verdict card
+    from verified facts regardless of what the prose says."""
+
+    answer: str
+    resolved_case: ResolveResponse | None = None
+    verdict: RiskResponse | None = None

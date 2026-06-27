@@ -21,6 +21,11 @@ def _get_client() -> genai.Client:
     return _client
 
 
+def get_client() -> genai.Client:
+    """Public accessor for the lazy Vertex client (used by the agentic /ask loop)."""
+    return _get_client()
+
+
 async def generate_reply(message: str, history: list[dict] | None = None) -> str:
     contents: list[types.Content] = []
     for turn in history or []:

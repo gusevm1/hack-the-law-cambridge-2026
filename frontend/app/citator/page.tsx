@@ -4,6 +4,7 @@
 // unauthenticated (see app/src/htl/routes/resolve.py · risk.py). No global auth
 // middleware, so this route is public by default, matching the endpoints.
 import { useState } from "react";
+import Link from "next/link";
 import { resolve, caseRisk, type RiskResult } from "../../lib/api";
 import { VerdictCard } from "../../components/verdict-card";
 
@@ -75,7 +76,10 @@ export default function Citator() {
         <h1 className="text-lg font-semibold">Citator — is it still good law?</h1>
         <p className="text-xs opacity-60">
           Look up a case by citation or name and see its erosion signal. General
-          information, not legal advice.
+          information, not legal advice.{" "}
+          <Link href="/assistant" className="underline underline-offset-2 hover:opacity-80">
+            Try the assistant →
+          </Link>
         </p>
       </header>
 

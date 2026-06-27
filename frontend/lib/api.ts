@@ -99,3 +99,16 @@ export async function resolve(query: string): Promise<ResolveResult> {
 export async function caseRisk(id: number): Promise<RiskResult> {
   return request(`/cases/${id}/risk`);
 }
+
+// --- /ask — agentic citator assistant (public) ------------------------------ #
+// Mirrors app/src/htl/models/api.py AskRequest/AskResponse.
+export type AskResult = {
+  answer: string;
+  resolved_case: ResolveResult | null;
+  verdict: RiskResult | null;
+};
+
+// `caseText` avoids the JS reserved word; the request body key is `case`.
+export async function ask(caseText: string, use: string): Promise<AskResult> {
+  return request("/ask", { method: "POST", body: { case: caseText, use } });
+}
