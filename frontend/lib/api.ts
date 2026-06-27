@@ -112,3 +112,45 @@ export type AskResult = {
 export async function ask(caseText: string, use: string): Promise<AskResult> {
   return request("/ask", { method: "POST", body: { case: caseText, use } });
 }
+
+// --- Citations + triage (citator filter stage) — mirror api.py exactly ------ #
+export type Edge = {
+  citing_case: CitingCaseRef;
+  citation: string | null;
+  passage: string;
+  source: string; // "graph" | "fulltext"
+  matched_citation: string | null;
+  opinion_url: string | null;
+};
+
+export type CitationsResult = { case: CaseRef; total: number; edges: Edge[] };
+
+export type TriageSignals = {
+  binding: boolean;
+  treatment_kw: string[];
+  propositions_engaged: string[];
+  recency_years: number;
+};
+
+export type TieredEdge = Edge & {
+  tier: string; // "deep" | "shallow" | "mention"
+  reasons: string[];
+  signals: TriageSignals;
+};
+
+export type TriageCounts = { deep: number; shallow: number; mention: number };
+
+export type TriageResult = {
+  case: CaseRef;
+  total: number;
+  counts: TriageCounts;
+  edges: TieredEdge[];
+};
+
+export async function caseCitations(id: number): Promise<CitationsResult> {
+  return request(`/cases/${id}/citations`);
+}
+
+export async function caseTriage(id: number): Promise<TriageResult> {
+  return request(`/cases/${id}/triage`);
+}

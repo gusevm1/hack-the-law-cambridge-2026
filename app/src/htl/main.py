@@ -21,7 +21,7 @@ from htl import logging_config
 from htl.correlation import CORRELATION_ID_HEADER, CorrelationIdMiddleware, get_correlation_id
 from htl.db.engine import dispose_engine
 from htl.errors import AppError, ValidationFailed
-from htl.routes import ask, chat, health, resolve, risk
+from htl.routes import ask, chat, citations, health, resolve, risk, triage
 from htl.settings import settings
 
 _logger = structlog.get_logger("htl.main")
@@ -70,4 +70,6 @@ app.include_router(health.router)
 app.include_router(chat.router)
 app.include_router(resolve.router)
 app.include_router(risk.router)
+app.include_router(citations.router)
+app.include_router(triage.router)
 app.include_router(ask.router)
