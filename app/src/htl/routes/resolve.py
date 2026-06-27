@@ -14,15 +14,13 @@ needs a token — we use unauth ``search`` + the local DB for now.
 from __future__ import annotations
 
 import asyncio
-import json
-import ssl
 import urllib.parse
-import urllib.request
 from typing import Any
 
 from fastapi import APIRouter
 from sqlalchemy import select
 
+from htl.citator.cl_client import cl_get_json
 from htl.db.citator import ClOpinion
 from htl.models.api import ResolveRequest, ResolveResponse
 from htl.routes.dependencies import DbSession
@@ -30,25 +28,15 @@ from htl.routes.dependencies import DbSession
 router = APIRouter()
 
 CL_SEARCH_URL = "https://www.courtlistener.com/api/rest/v4/search/"
-USER_AGENT = "htl-citator/0.1 (hack-the-law-cambridge-2026)"
-
-# macOS Pythons often lack a system CA bundle; certifi (a transitive dep) is the
-# repo's standard fix (mirrors scripts/ingest_citator.py).
-try:
-    import certifi
-
-    _SSL_CTX: ssl.SSLContext | None = ssl.create_default_context(cafile=certifi.where())
-except Exception:  # pragma: no cover - certifi always present here
-    _SSL_CTX = None
 
 
 def cl_search(query: str) -> dict[str, Any]:
-    """Unauthenticated CourtListener v4 search for SCOTUS opinions (blocking)."""
+    """Unauthenticated CourtListener v4 SCOTUS search, through the single-flight
+    paced client (so it can't race ingest against the rate limit). Blocking — the
+    route calls it via ``asyncio.to_thread``."""
     params = {"q": query, "court": "scotus", "type": "o"}
     url = CL_SEARCH_URL + "?" + urllib.parse.urlencode(params)
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(req, timeout=15, context=_SSL_CTX) as resp:  # noqa: S310
-        return json.loads(resp.read().decode())
+    return cl_get_json(url)
 
 
 def _pick_citation(cit: Any) -> str | None:
