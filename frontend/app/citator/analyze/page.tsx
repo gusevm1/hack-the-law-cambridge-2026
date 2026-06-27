@@ -2,14 +2,22 @@
 
 // Citator analysis stepper. Fetches GET /cases/{id}/triage (public, no auth — see
 // app/src/htl/routes/triage.py), which carries the resolved case + every inbound
-// edge tiered deep|shallow|mention. Resolve, Citations and Treatment (the deep
-// per-case read, Feature 3) are live; Relation / Verdict are placeholders for
-// Features 4/5. Defaults to Bruen (6480696). The case shown comes from the triage
+// edge tiered deep|shallow|mention. Resolve, Citations, Treatment (the deep
+// per-case read, Feature 3) and Relation (per-proposition evolution + risk,
+// Feature 4) are live; Verdict is a placeholder for Feature 5. Defaults to Bruen
+// (6480696). The case shown comes from the triage
 // response itself, so this never depends on the live /resolve or the DB.
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { caseTriage, type TriageResult, type TieredEdge } from "@/lib/api";
+import {
+  caseTriage,
+  casePropositions,
+  type TriageResult,
+  type TieredEdge,
+  type PropositionsResult,
+} from "@/lib/api";
 import { TreatmentStep } from "./steps/treatment";
+import { RelationStep } from "./steps/relation";
 
 const BRUEN_ID = 6480696;
 const API_DOWN = "Couldn't reach the citator API — is `just dev-api` running?";
@@ -59,10 +67,14 @@ export default function Analyze() {
   const [data, setData] = useState<TriageResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [props, setProps] = useState<PropositionsResult | null>(null);
+  const [propsLoading, setPropsLoading] = useState(false);
+  const [propsError, setPropsError] = useState<string | null>(null);
 
   async function load(id: number) {
     setLoading(true);
     setError(null);
+    setProps(null); // stale aggregation belongs to the previous case
     try {
       setData(await caseTriage(id));
     } catch {
@@ -76,6 +88,24 @@ export default function Analyze() {
   useEffect(() => {
     load(BRUEN_ID);
   }, []);
+
+  // Lazily aggregate propositions when the user reaches the Relation step — the
+  // backend read is slow, so don't pay for it until they look. (The Treatment step
+  // self-fetches /analyze on mount.)
+  useEffect(() => {
+    if (step !== 3 || !data) return;
+    if (props && props.case.case_id === data.case.case_id) return;
+    let cancelled = false;
+    setPropsLoading(true);
+    setPropsError(null);
+    casePropositions(data.case.case_id)
+      .then((r) => !cancelled && setProps(r))
+      .catch(() => !cancelled && setPropsError(API_DOWN))
+      .finally(() => !cancelled && setPropsLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [step, data, props]);
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-8">
@@ -149,15 +179,12 @@ export default function Analyze() {
           {step === 1 && <CitationsStep data={data} />}
           {step === 2 && <TreatmentStep caseId={data.case.case_id} />}
           {step === 3 && (
-            <Placeholder
-              title="Relation"
-              body="Feature 4 — buckets the findings by proposition and chains the foundation/refinement authorities (Heller → McDonald → Bruen → Rahimi)."
-            />
+            <RelationStep data={props} loading={propsLoading} error={propsError} />
           )}
           {step === 4 && (
             <Placeholder
               title="Verdict"
-              body="Feature 5 — per-proposition signed risk → the composed operative rule: “Bruen, good law as modified by Rahimi (2024).”"
+              body="Feature 5 — risk relative to your intended use: maps the use to the propositions it depends on, then intersects with the compromised ones for a use-aware verdict."
             />
           )}
 
