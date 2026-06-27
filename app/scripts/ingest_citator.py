@@ -242,6 +242,30 @@ def _search_citers(search: Search, op_ids: list[int], *,
     return out
 
 
+def _search_fulltext(search: Search, citations: list[str], *,
+                     court: str | None = None, pages: int = 1,
+                     order: str = "dateFiled desc") -> list[dict[str, Any]]:
+    """Discover citers the structured ``cites:`` graph MISSES, via full-text reporter
+    match. CourtListener's citation graph is incomplete for recent opinions, so cases
+    like United States v. Rahimi / Hemani cite Bruen in their text but have no graph
+    edge. Searching the target's parallel reporters (``"597 U.S. 1"`` etc.) recovers
+    them. This is the ``source="fulltext"`` half of the retrieval union."""
+    out: list[dict[str, Any]] = []
+    for cite in citations:
+        if not cite:
+            continue
+        for page in range(1, pages + 1):
+            params: dict[str, Any] = {"type": "o", "q": f'"{cite}"',
+                                      "highlight": "on", "order_by": order, "page": page}
+            if court:
+                params["court"] = court
+            data = search(params)
+            out.extend(data.get("results") or [])
+            if not data.get("next"):
+                break
+    return out
+
+
 def collect_case(search: Search, *, name: str, citation: str,
                  max_edges: int = 150, max_texts: int = 40,
                  pages: int = 3, high_court_pages: int = 5) -> CaseData | None:
@@ -265,12 +289,16 @@ def collect_case(search: Search, *, name: str, citation: str,
     case = CaseData(target=opinion_row(target_res, source="cl_api", citation=citation))
 
     seen: dict[int, dict[str, Any]] = {}
+    fulltext_ids: set[int] = set()  # cluster ids discovered only via full-text
 
-    def _absorb(results: list[dict[str, Any]]) -> None:
+    def _absorb(results: list[dict[str, Any]], *, fulltext: bool = False) -> None:
         for r in results:
             cid = r.get("cluster_id")
             if cid and cid != cited_id:
-                seen.setdefault(cid, r)
+                if cid not in seen:
+                    seen[cid] = r
+                    if fulltext:
+                        fulltext_ids.add(cid)
 
     # Tier 1a — high courts in FULL (bounded; this is where binding treatments live).
     for court in HIGH_COURTS:
@@ -278,6 +306,13 @@ def collect_case(search: Search, *, name: str, citation: str,
                                order="dateFiled desc"))
     # Tier 1b — a dated sample of the lower-court long tail (the rest is mined later).
     _absorb(_search_citers(search, op_ids, pages=pages, order="dateFiled desc"))
+
+    # Tier 1c — FULL-TEXT discovery: union in citers the cites: graph is missing
+    # (recent opinions like Rahimi/Hemani cite the target in text but have no graph
+    # edge). Search the target's parallel reporters, SCOTUS-first then a recent pass.
+    parallel = [c for c in (target_res.get("citation") or []) if c] or [citation]
+    _absorb(_search_fulltext(search, parallel, court="scotus", pages=1), fulltext=True)
+    _absorb(_search_fulltext(search, parallel, pages=pages), fulltext=True)
 
     # Collapse revision duplicates of the *same* opinion (recall-safe), high courts first.
     deduped: list[dict[str, Any]] = []
@@ -300,12 +335,15 @@ def collect_case(search: Search, *, name: str, citation: str,
     if revision_dupes:
         print(f"    · collapsed {revision_dupes} revision-duplicate cluster(s) for {name}")
     deferred = len(tail) - len(tail_kept)
+    ft_kept = sum(1 for r in ranked if r["cluster_id"] in fulltext_ids)
     print(f"    · {len(high)} high-court + {len(tail_kept)} tail citer(s) for {name}"
+          + (f"; {ft_kept} via full-text (graph-missed)" if ft_kept else "")
           + (f"; {deferred}+ lower-court cites deferred to the background crawl" if deferred else ""))
 
     for r in ranked:
         cid = r["cluster_id"]
-        case.citers.append(opinion_row(r, source="cl_api", plain_text=result_snippet(r)))
+        src = "cl_fulltext" if cid in fulltext_ids else "cl_api"
+        case.citers.append(opinion_row(r, source=src, plain_text=result_snippet(r)))
         case.edges.append((cid, cited_id, 1))
         opid = lead_opinion_id(r)
         if opid:
@@ -386,7 +424,7 @@ def seed_case(citation: str) -> CaseData | None:
 # --------------------------------------------------------------------------- #
 # HTTP + DB plumbing.                                                          #
 # --------------------------------------------------------------------------- #
-def http_get_json(url: str, *, token: str | None = None, timeout: int = 30,
+def http_get_json(url: str, *, token: str | None = None, timeout: int = 60,
                   retries: int = 4) -> dict[str, Any]:
     """All CourtListener access goes through the single-flight, globally-paced
     client (lock + ≥20s spacing + 429 backoff) so concurrent callers can't race

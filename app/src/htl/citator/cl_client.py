@@ -71,10 +71,19 @@ def _request_with_backoff(url: str, token: str | None, timeout: int, retries: in
                 time.sleep(wait)
                 continue
             raise
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            # Transient network blip / read timeout — retry rather than abort the
+            # whole crawl (a single timeout used to kill a 13-min ingest).
+            if attempt < retries:
+                wait = 5 * (attempt + 1)
+                print(f"    · network error ({e}); retrying in {wait}s")
+                time.sleep(wait)
+                continue
+            raise
     raise RuntimeError("unreachable")  # pragma: no cover
 
 
-def cl_get_json(url: str, *, token: str | None = None, timeout: int = 30,
+def cl_get_json(url: str, *, token: str | None = None, timeout: int = 60,
                 retries: int = 4) -> dict[str, Any]:
     """Fetch JSON from CourtListener under a global single-flight lock + pacing.
 
