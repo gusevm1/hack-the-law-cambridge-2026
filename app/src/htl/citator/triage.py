@@ -22,6 +22,7 @@ from __future__ import annotations
 import re
 from datetime import date
 
+from htl.citator import courts
 from htl.citator.propositions import PHRASES as PROPOSITION_PHRASES
 from htl.models.api import (
     CaseRef,
@@ -51,24 +52,9 @@ OTHER_TREATMENT = {
 TREATMENT_KEYWORDS = STRONG_TREATMENT | OTHER_TREATMENT
 
 _PROCEDURAL = "by operation of law"  # "overruled by operation of law" = a docket event
-_FED_CIRCUIT = re.compile(r"^(ca\d+|cadc|cafc)$")
 
-# Tunable factor weights / threshold.
-_BINDING_W = {"apex": 1.0, "circuit": 0.7, "other": 0.3}
+# Court binding tier lives in citator.courts (shared with retrieval ingest).
 _DEEP_SCORE = 0.40  # score at/above this (and binding) → deep
-
-
-def _binding(court: str | None) -> tuple[bool, float]:
-    """A citing court binds the (SCOTUS) target only if apex/federal-circuit.
-
-    ponytail: target assumed SCOTUS (Bruen). For a circuit/state target the
-    binding set would narrow — encode per-target if we generalise past gun law.
-    """
-    if court == "scotus":
-        return True, _BINDING_W["apex"]
-    if court and _FED_CIRCUIT.match(court):
-        return True, _BINDING_W["circuit"]
-    return False, _BINDING_W["other"]
 
 
 def _target_tokens(case_name: str | None) -> list[str]:
@@ -117,7 +103,7 @@ def _reversed_direction(passage: str, target_tokens: list[str]) -> bool:
 def _tier_one(edge: Edge, target_tokens: list[str], today: date) -> TieredEdge:
     passage = edge.passage or ""
     court = edge.citing_case.court
-    binding, binding_w = _binding(court)
+    binding, binding_w = courts.binding(court)
     treatment_kw = _matched(passage, TREATMENT_KEYWORDS)
     strong_kw = _matched(passage, STRONG_TREATMENT)
     props = _propositions(passage)

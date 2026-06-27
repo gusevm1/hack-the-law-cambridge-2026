@@ -40,6 +40,7 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from htl.citator.cl_client import cl_get_json
+from htl.citator.courts import HIGH_COURTS, court_rank
 from htl.db.citator import CitationEdge, ClOpinion
 from htl.db.engine import dispose_engine, get_session_factory
 
@@ -54,7 +55,6 @@ DEFAULT_CASES = [
 ]
 
 _TAG = re.compile(r"<[^>]+>")
-_FED_APPELLATE = re.compile(r"^(ca\d+|cadc|cafc)$")
 
 Search = Callable[[dict[str, Any]], dict[str, Any]]
 
@@ -88,19 +88,6 @@ def pick_citation(cit: Any, prefer: str | None = None) -> str | None:
         if " U.S. " in c:
             return c
     return cit[0]
-
-
-def court_rank(court_id: str | None) -> int:
-    """Lower is higher: SCOTUS < federal appellate < everything else."""
-    if court_id == "scotus":
-        return 0
-    if court_id and _FED_APPELLATE.match(court_id):
-        return 1
-    return 2
-
-
-# The binding tier — fetched in full (bounded). Everything else is the sampled tail.
-HIGH_COURTS = ["scotus", "cadc", "cafc", *(f"ca{i}" for i in range(1, 12))]
 
 
 def lead_opinion_id(result: dict[str, Any]) -> int | None:
