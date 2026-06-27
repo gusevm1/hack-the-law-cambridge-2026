@@ -94,6 +94,39 @@ def test_collect_case_searches_graph_by_all_opinion_ids_no_literal_cite() -> Non
     assert any(c["case_name"] == "United States v. Rahimi" for c in case.citers)
 
 
+def test_collect_case_unions_fulltext_discovery() -> None:
+    # Rahimi cites Bruen in text but is MISSING from the cites: graph; full-text
+    # discovery (quoted reporter) must union it in, tagged source="cl_fulltext".
+    target = {"results": [{
+        "cluster_id": 6480696, "caseName": "NYSRPA v. Bruen", "court_id": "scotus",
+        "citation": ["597 U.S. 1"], "dateFiled": "2022-06-23", "opinions": [{"id": 11}],
+    }]}
+    graph_citers = {"next": None, "results": [{
+        "cluster_id": 500, "caseName": "Some Circuit Case", "court_id": "ca5",
+        "citation": ["1 F.4th 1"], "dateFiled": "2023-01-01",
+        "opinions": [{"id": 700, "snippet": "applying Bruen"}],
+    }]}
+    fulltext_only = {"next": None, "results": [{
+        "cluster_id": 9679332, "caseName": "United States v. Rahimi", "court_id": "scotus",
+        "citation": ["602 U.S. 680"], "dateFiled": "2024-06-21",
+        "opinions": [{"id": 900, "snippet": "not a law trapped in amber"}],
+    }]}
+
+    def fake(params: dict) -> dict:
+        if params["q"].startswith("cites:"):
+            return graph_citers
+        if "order_by" in params:  # full-text reporter pass
+            return fulltext_only
+        return target  # resolve_target
+
+    case = ingest.collect_case(fake, name="NYSRPA v. Bruen", citation="597 U.S. 1",
+                               max_edges=60, max_texts=40, pages=1)
+    assert case is not None
+    src = {c["case_name"]: c["source"] for c in case.citers}
+    assert src.get("United States v. Rahimi") == "cl_fulltext"  # graph-missed → full-text
+    assert src.get("Some Circuit Case") == "cl_api"  # found via the cites: graph
+
+
 def test_party_surnames_takes_both_sides_and_drops_generic() -> None:
     # both parties (usage varies: "Roe" vs "Wade"); used as passage-location needles
     assert ingest.party_surnames("Roe v. Wade") == ["roe", "wade"]
@@ -140,7 +173,11 @@ _CITERS = {
 
 
 def _fake_search(params: dict) -> dict:
-    return _CITERS if params["q"].startswith("cites:") else _RESOLVE
+    if params["q"].startswith("cites:"):
+        return _CITERS
+    if "order_by" in params:  # full-text discovery pass (quoted reporter) — empty here
+        return {"results": []}
+    return _RESOLVE  # resolve_target
 
 
 def test_collect_case_resolves_target_and_builds_graph() -> None:
