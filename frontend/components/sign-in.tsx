@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { supabaseOrNull } from "@/lib/supabase";
+import { SignInBackdrop } from "@/components/sign-in-backdrop";
 
 type Provider = "google" | "github";
 type Mode = "signin" | "signup";
@@ -67,108 +68,123 @@ export function SignIn() {
     "h-10 rounded-full border border-black/15 bg-transparent px-4 text-sm outline-none transition-colors placeholder:opacity-40 focus:border-black/40 dark:border-white/20 dark:focus:border-white/50";
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-5 py-12">
-      {/* Brand + value proposition */}
-      <div className="mb-8">
-        <div className="flex items-center gap-2.5">
-          <Mark />
-          <span className="text-sm font-semibold tracking-tight">CiteMeRight</span>
+    <main className="relative min-h-dvh overflow-hidden">
+      <SignInBackdrop />
+
+      <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-5 py-12">
+        {/* Brand + value proposition */}
+        <div className="mb-8">
+          <div className="rise flex items-center gap-2.5">
+            <Mark />
+            <span className="text-sm font-semibold tracking-tight">CiteMeRight</span>
+          </div>
+          <h1
+            className="rise mt-6 text-2xl font-semibold tracking-tight"
+            style={{ animationDelay: "70ms" }}
+          >
+            Know if a case is still good law before you cite it.
+          </h1>
+          <p className="rise mt-2 text-sm opacity-60" style={{ animationDelay: "140ms" }}>
+            CiteMeRight reads the citation graph and tells you whether a precedent still
+            holds, grounded in the opinions that treat it, never a guess.
+          </p>
         </div>
-        <h1 className="mt-6 text-2xl font-semibold tracking-tight">
-          Know if a case is still good law — before you cite it.
-        </h1>
-        <p className="mt-2 text-sm opacity-60">
-          CiteMeRight reads the citation graph and tells you whether a precedent still
-          holds — grounded in the opinions that treat it, never a guess.
+
+        {/* Auth card */}
+        <div
+          className="rise rounded-3xl border border-black/10 bg-background/70 p-6 backdrop-blur-sm dark:border-white/15"
+          style={{ animationDelay: "210ms" }}
+        >
+          <h2 className="text-base font-semibold">
+            {mode === "signin" ? "Sign in" : "Create your account"}
+          </h2>
+          <p className="mt-1 text-sm opacity-60">
+            {mode === "signin"
+              ? "Pick up where you left off."
+              : "Start checking precedent in seconds."}
+          </p>
+
+          <div className="mt-5 grid gap-2.5">
+            <button type="button" onClick={() => onOAuth("google")} disabled={busy !== null} className={oauthClass}>
+              <GoogleIcon />
+              {busy === "google" ? "Redirecting…" : "Continue with Google"}
+            </button>
+            <button type="button" onClick={() => onOAuth("github")} disabled={busy !== null} className={oauthClass}>
+              <GitHubIcon />
+              {busy === "github" ? "Redirecting…" : "Continue with GitHub"}
+            </button>
+          </div>
+
+          <div className="my-5 flex items-center gap-3">
+            <div className="h-px flex-1 bg-black/10 dark:bg-white/15" />
+            <span className="text-[11px] uppercase tracking-widest opacity-40">or with email</span>
+            <div className="h-px flex-1 bg-black/10 dark:bg-white/15" />
+          </div>
+
+          <form onSubmit={onEmail} className="grid gap-2.5">
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              autoComplete="email"
+              className={inputClass}
+            />
+            <input
+              type="password"
+              required
+              minLength={6}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password"
+              autoComplete={mode === "signin" ? "current-password" : "new-password"}
+              className={inputClass}
+            />
+
+            {error && (
+              <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+                {error}
+              </p>
+            )}
+            {notice && <p className="text-sm text-green-700 dark:text-green-400">{notice}</p>}
+
+            <button
+              type="submit"
+              disabled={busy !== null}
+              className="mt-1 h-10 rounded-full bg-foreground text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-40"
+            >
+              {busy === "email"
+                ? "Working…"
+                : mode === "signin"
+                  ? "Sign in"
+                  : "Create account"}
+            </button>
+          </form>
+
+          <p className="mt-5 text-center text-sm opacity-60">
+            {mode === "signin" ? "No account yet?" : "Already have an account?"}{" "}
+            <button
+              type="button"
+              onClick={() => {
+                setMode(mode === "signin" ? "signup" : "signin");
+                setError(null);
+                setNotice(null);
+              }}
+              className="font-medium underline underline-offset-2 hover:opacity-80"
+            >
+              {mode === "signin" ? "Create one" : "Sign in"}
+            </button>
+          </p>
+        </div>
+
+        <p
+          className="rise mt-6 text-center text-xs opacity-40"
+          style={{ animationDelay: "280ms" }}
+        >
+          General information, not legal advice.
         </p>
       </div>
-
-      {/* Auth card */}
-      <div className="rounded-3xl border border-black/10 p-6 dark:border-white/15">
-        <h2 className="text-base font-semibold">
-          {mode === "signin" ? "Sign in" : "Create your account"}
-        </h2>
-        <p className="mt-1 text-sm opacity-60">
-          {mode === "signin"
-            ? "Pick up where you left off."
-            : "Start checking precedent in seconds."}
-        </p>
-
-        <div className="mt-5 grid gap-2.5">
-          <button type="button" onClick={() => onOAuth("google")} disabled={busy !== null} className={oauthClass}>
-            <GoogleIcon />
-            {busy === "google" ? "Redirecting…" : "Continue with Google"}
-          </button>
-          <button type="button" onClick={() => onOAuth("github")} disabled={busy !== null} className={oauthClass}>
-            <GitHubIcon />
-            {busy === "github" ? "Redirecting…" : "Continue with GitHub"}
-          </button>
-        </div>
-
-        <div className="my-5 flex items-center gap-3">
-          <div className="h-px flex-1 bg-black/10 dark:bg-white/15" />
-          <span className="text-[11px] uppercase tracking-widest opacity-40">or with email</span>
-          <div className="h-px flex-1 bg-black/10 dark:bg-white/15" />
-        </div>
-
-        <form onSubmit={onEmail} className="grid gap-2.5">
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
-            autoComplete="email"
-            className={inputClass}
-          />
-          <input
-            type="password"
-            required
-            minLength={6}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password"
-            autoComplete={mode === "signin" ? "current-password" : "new-password"}
-            className={inputClass}
-          />
-
-          {error && (
-            <p className="text-sm text-red-600 dark:text-red-400" role="alert">
-              {error}
-            </p>
-          )}
-          {notice && <p className="text-sm text-green-700 dark:text-green-400">{notice}</p>}
-
-          <button
-            type="submit"
-            disabled={busy !== null}
-            className="mt-1 h-10 rounded-full bg-foreground text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-40"
-          >
-            {busy === "email"
-              ? "Working…"
-              : mode === "signin"
-                ? "Sign in"
-                : "Create account"}
-          </button>
-        </form>
-
-        <p className="mt-5 text-center text-sm opacity-60">
-          {mode === "signin" ? "No account yet?" : "Already have an account?"}{" "}
-          <button
-            type="button"
-            onClick={() => {
-              setMode(mode === "signin" ? "signup" : "signin");
-              setError(null);
-              setNotice(null);
-            }}
-            className="font-medium underline underline-offset-2 hover:opacity-80"
-          >
-            {mode === "signin" ? "Create one" : "Sign in"}
-          </button>
-        </p>
-      </div>
-
-      <p className="mt-6 text-center text-xs opacity-40">General information, not legal advice.</p>
     </main>
   );
 }
