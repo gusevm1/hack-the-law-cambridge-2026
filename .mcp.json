@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "courtlistener": {
+      "command": "uvx",
+      "args": ["--from", "courtlistener-api-client[mcp]==1.0.0", "courtlistener-mcp"],
+      "env": {
+        "COURTLISTENER_API_TOKEN": "${COURTLISTENER_TOKEN}"
+      }
+    }
+  }
+}
