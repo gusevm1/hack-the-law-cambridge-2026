@@ -77,7 +77,7 @@ export function SourceCard({
           href={sourceUrl}
           target="_blank"
           rel="noreferrer"
-          className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-sky-400 hover:text-sky-300"
+          className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-slate-200 underline underline-offset-2 hover:text-white"
         >
           View source opinion ↗
         </a>
