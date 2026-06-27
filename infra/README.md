@@ -19,7 +19,7 @@ Two scripts, both parameterized by env vars. **Nothing is hardcoded to one login
 | `ORG_ID` | _(unset)_ | bootstrap (org for a created project) |
 | `SERVICE` | `htl-api` | deploy (Cloud Run service name) |
 | `VERTEX_LOCATION` | `global` | deploy (Gemini region) |
-| `GEMINI_MODEL` | `gemini-2.5-flash` | deploy |
+| `GEMINI_MODEL` | `gemini-3.5-flash` | deploy (unmapped-task default; per-task routing lives in settings) |
 
 ## Rebuild on a new account (the tomorrow case)
 

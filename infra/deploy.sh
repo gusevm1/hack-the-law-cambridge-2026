@@ -7,7 +7,7 @@ set -euo pipefail
 source "$(dirname "$0")/env.sh"  # PROJECT_ID, REGION — the account/project source of truth
 SERVICE="${SERVICE:-htl-api}"
 VERTEX_LOCATION="${VERTEX_LOCATION:-global}"
-GEMINI_MODEL="${GEMINI_MODEL:-gemini-2.5-flash}"
+GEMINI_MODEL="${GEMINI_MODEL:-gemini-3.5-flash}"
 
 # --- Cloud SQL + Supabase auth (provisioned by bootstrap.sh) ----------------
 DB_INSTANCE="${DB_INSTANCE:-htl-db}"
