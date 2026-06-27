@@ -4,6 +4,11 @@
 (ours + Maxim's), live. Stef's static HTML port was abandoned (janky flow); the
 real deliverable is a fresh React page.
 
+**FOR MAXIM — `devil` = everything not yet on main, in one branch, tests green
+(98 passed). Merge `devil` → `main` and you have it all:** the UI (5 commits) +
+full-text discovery + the network-timeout retry (cherry-picked clean on top of
+current main). Nothing else to merge. `feat/citemeright-ui` is the same HEAD.
+
 ## The deliverable (DONE, on branch `feat/citemeright-ui`)
 - **`frontend/app/citator/dossier/page.tsx`** → route **`/citator/dossier`**. One dark
   scroll showing EVERYTHING live: verdict hero + operative rule · treatment-mix /
@@ -32,7 +37,7 @@ cd frontend && corepack pnpm@10 dev                          # web :3000 → .en
 1. **Make the dossier the real `/citator`** — coordinate first: colleague owns `frontend/app/citator/*` + is steering to CiteMeRight (`citemeright.com`, #45/#47/#48). Don't silently overwrite.
 2. **Rahimi/Hemani classify as "followed", not their narrowing** — passage-window grabs the opinion *intro* (first-occurrence). Fix = best-occurrence extraction (passage near a treatment verb). `app/scripts/ingest_citator.py::passage_window`. The `/propositions` layer DOES capture it ("Bruen — good law as modified by Rahimi").
 3. **Heller** = outbound/foundations (Bruen→Heller); we only ingest inbound. Build outbound query if wanted.
-4. **`feat/fulltext-discovery`** (full-text union + 429/timeout-retry in `cl_client`) — review/merge.
+4. ~~`feat/fulltext-discovery`~~ — DONE: the two new commits (full-text union + timeout-retry) are now cherry-picked onto `devil`. The rest of that old branch was already on main via #43.
 5. **Prod**: load `citator-dump.sql` into Cloud SQL (needs `gcloud auth login` as devstar5221) ; prod treatments were keyword-fallback (sandbox blocks user Vertex).
 
 ## Constraints / gotchas
