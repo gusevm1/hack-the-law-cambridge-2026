@@ -13,18 +13,31 @@ import Link from "next/link";
 import { useAuth } from "../../lib/auth";
 import { AccountMenu } from "../../components/account-menu";
 import { CitationGraph } from "../../components/citation-graph";
+import { Chat } from "../../components/chat";
 import {
-  caseGraph, caseRisk, caseTriage, casePropositions, caseVerdict, resolve,
+  caseGraph, caseRisk, caseTriage, casePropositions, caseVerdict,
   type GraphEdge, type GraphResult, type RiskResult, type TriageResult,
   type PropositionsResult, type VerdictResult,
 } from "../../lib/api";
 
-const DEMO = [
-  { name: "NYSRPA v. Bruen", id: 6480696 }, { name: "Roe v. Wade", id: 108713 },
-  { name: "Plessy v. Ferguson", id: 94508 }, { name: "Bowers v. Hardwick", id: 111738 },
-  { name: "Lochner v. New York", id: 96276 }, { name: "Auer v. Robbins", id: 118089 },
-  { name: "Emp. Div. v. Smith", id: 112404 },
+// Starters for the top doctrinal chat — the questions the demo answers best.
+const ASK_STARTERS = [
+  "What is the current test under Bruen?",
+  "How has Rahimi been treated since 2024?",
 ];
+
+// Collapse duplicate citing cases (same title) — retrieval can surface one opinion
+// under parallel citations / multiple passages.
+function dedupeByName<T extends { citing_case: { case_name: string | null } }>(xs: T[]): T[] {
+  const seen = new Set<string>();
+  return xs.filter((x) => {
+    const k = (x.citing_case.case_name ?? "").toLowerCase().trim();
+    if (!k) return true;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
 
 const SIG: Record<string, { txt: string; ring: string; glow: string; label: string; dot: string; chip: string }> = {
   red: { txt: "text-red-400", ring: "ring-red-500/50", glow: "shadow-red-500/30", label: "No longer good law", dot: "bg-red-500", chip: "bg-red-500/15 text-red-300 ring-red-500/40" },
@@ -54,7 +67,6 @@ type Phase = "retrieve" | "analyzing" | "findings";
 export default function Citator() {
   const { session } = useAuth();
   const email = session?.user?.email ?? null;
-  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [risk, setRisk] = useState<RiskResult | null>(null);
@@ -80,17 +92,6 @@ export default function Citator() {
   }, []);
 
   useEffect(() => { const t = setTimeout(() => void load(6480696), 0); return () => clearTimeout(t); }, [load]);
-
-  async function onSearch(e: React.FormEvent) {
-    e.preventDefault();
-    const q = query.trim(); if (!q || loading) return;
-    setLoading(true); setErr(null);
-    try {
-      const id = DEMO.find((d) => d.name.toLowerCase().includes(q.toLowerCase()))?.id
-        ?? (await resolve(q)).case_id;
-      if (id) await load(id); else setErr(`No case found for “${q}”.`);
-    } catch { setErr("Lookup failed."); } finally { setLoading(false); }
-  }
 
   async function runAnalysis() {
     if (!risk) return;
@@ -156,13 +157,19 @@ export default function Citator() {
           </div>
         </header>
 
-        {/* search */}
-        <form onSubmit={onSearch} className="flex gap-2">
-          <input value={query} onChange={(e) => setQuery(e.target.value)}
-            placeholder="Is it still good law?  ·  case name or citation"
-            className="flex-1 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm outline-none placeholder:text-slate-500 focus:border-white/30" />
-          <button disabled={loading || !query.trim()} className="rounded-full bg-white px-6 text-sm font-medium text-slate-900 transition hover:bg-slate-200 disabled:opacity-40">Check</button>
-        </form>
+        {/* TOP: doctrinal chat — ask the source graph anything */}
+        <Card className="border-sky-500/30 bg-sky-500/[0.04] p-6">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-sky-400" />
+            <H>Ask the citator</H>
+          </div>
+          <p className="mt-1.5 text-sm text-slate-400">
+            How the doctrine stands today, grounded in the citation graph, not from memory.
+          </p>
+          <div className="mt-4">
+            <Chat starters={ASK_STARTERS} placeholder="What is the current test under Bruen?" />
+          </div>
+        </Card>
         {err && <p className="mt-5 text-sm text-red-400">{err}</p>}
         {loading && <p className="mt-5 text-sm text-slate-500">Loading…</p>}
 
@@ -309,11 +316,12 @@ export default function Citator() {
 
             {/* what later courts said — one consolidated summary */}
             {(() => {
-              const neg = risk.negative_treatments.length;
+              const negs = dedupeByName(risk.negative_treatments);
+              const neg = negs.length;
               const appr = risk.positive_signal.approving_cites;
               const total = risk.positive_signal.total_citing;
               const neutral = Math.max(0, total - appr - neg);
-              const latest = [...risk.negative_treatments].sort((a, b) => (b.citing_case.date_filed ?? "").localeCompare(a.citing_case.date_filed ?? ""))[0];
+              const latest = [...negs].sort((a, b) => (b.citing_case.date_filed ?? "").localeCompare(a.citing_case.date_filed ?? ""))[0];
               return (
                 <Card className="cmr-fade p-5">
                   <H>What later courts said</H>
@@ -383,12 +391,32 @@ export default function Citator() {
               );
             })() : null}
 
-            {/* negative treatments — the receipts */}
-            {risk.negative_treatments.length > 0 && (
+            {/* ask about this case — scoped chat over the propositions on screen */}
+            <Card className="cmr-fade border-sky-500/30 bg-sky-500/[0.04] p-6">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-sky-400" />
+                <H>Ask about this case</H>
+              </div>
+              <p className="mt-1.5 text-sm text-slate-400">
+                Follow up on any proposition, how a holding was challenged, or why it still holds.
+              </p>
+              <div className="mt-4">
+                <Chat
+                  caseId={risk.case.case_id}
+                  starters={["Why is this still good law?", "Which decisions limited it?"]}
+                  placeholder={`Ask about ${(risk.case.case_name ?? "this case").split(" ").slice(0, 2).join(" ")}…`}
+                />
+              </div>
+            </Card>
+
+            {/* negative treatments — the receipts (deduped by citing case) */}
+            {(() => {
+              const negs = dedupeByName(risk.negative_treatments);
+              return negs.length > 0 ? (
               <Card className="cmr-fade p-5">
-                <H>Negative treatments ({risk.negative_treatments.length})</H>
+                <H>Negative treatments ({negs.length})</H>
                 <ul className="mt-3 space-y-3">
-                  {risk.negative_treatments.map((t, i) => (
+                  {negs.map((t, i) => (
                     <li key={i} className="rounded-xl border border-white/10 p-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] font-medium text-red-300 ring-1 ring-red-500/40">{t.type}{t.on_other_grounds ? " · other grounds" : ""}</span>
@@ -400,7 +428,8 @@ export default function Citator() {
                   ))}
                 </ul>
               </Card>
-            )}
+              ) : null;
+            })()}
           </div>
         )}
       </div>

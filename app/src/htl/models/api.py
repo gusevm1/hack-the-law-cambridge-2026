@@ -9,6 +9,10 @@ class ChatTurn(BaseModel):
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1)
     history: list[ChatTurn] = []
+    # Optional: the case on screen. Set by the analysis-page chat to scope answers
+    # to that case (its propositions are pre-loaded). Omitted by the global
+    # doctrinal chat, which resolves whatever case(s) the question needs.
+    case_id: int | None = None
 
 
 class ChatResponse(BaseModel):
