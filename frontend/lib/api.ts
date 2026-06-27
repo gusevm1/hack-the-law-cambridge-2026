@@ -211,6 +211,10 @@ export type AnalyzeResult = {
   edges: AnalyzedEdge[];
 };
 
+export async function caseAnalyze(id: number): Promise<AnalyzeResult> {
+  return request(`/cases/${id}/analyze`);
+}
+
 // --- Feature 4 (B): /cases/{id}/propositions -------------------------------- #
 export type TimelinePoint = {
   year: number;
