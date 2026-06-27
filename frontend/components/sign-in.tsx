@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabaseOrNull } from "@/lib/supabase";
 
 type Provider = "google" | "github";
 type Mode = "signin" | "signup";
@@ -16,8 +16,13 @@ export function SignIn() {
 
   async function onOAuth(provider: Provider) {
     setError(null);
+    const sb = supabaseOrNull();
+    if (!sb) {
+      setError("Sign-in isn't configured in this environment.");
+      return;
+    }
     setBusy(provider);
-    const { error } = await supabase().auth.signInWithOAuth({
+    const { error } = await sb.auth.signInWithOAuth({
       provider,
       options: { redirectTo: window.location.origin },
     });
@@ -32,8 +37,12 @@ export function SignIn() {
     e.preventDefault();
     setError(null);
     setNotice(null);
+    const sb = supabaseOrNull();
+    if (!sb) {
+      setError("Sign-in isn't configured in this environment.");
+      return;
+    }
     setBusy("email");
-    const sb = supabase();
     const creds = { email: email.trim(), password };
     const { data, error } =
       mode === "signin"
