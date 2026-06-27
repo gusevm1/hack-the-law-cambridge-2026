@@ -22,6 +22,7 @@ from __future__ import annotations
 import re
 from datetime import date
 
+from htl.citator.propositions import PHRASES as PROPOSITION_PHRASES
 from htl.models.api import (
     CaseRef,
     Edge,
@@ -32,27 +33,9 @@ from htl.models.api import (
 )
 
 # --- Signal vocab (deterministic) ------------------------------------------- #
-
-# Proposition spine — §4 lawyer-confirmed signal phrases. An edge "engages" a
-# proposition when its passage contains one of these. Phrases are matched
-# case-insensitively as substrings (they're multi-word / punctuated enough that
-# substring is safe and word-boundary regex would miss "sensitive places").
-PROPOSITION_PHRASES: dict[str, list[str]] = {
-    "P1": ["proper cause", "special need", "may-issue", "shall-issue", "second-class right"],
-    "P2": ["text, history, and tradition", "means-end", "two-step", "interest balancing",
-           "one step too many"],
-    "P2a": ["historical twin", "dead ringer", "relevantly similar", "how and why",
-            "comparable burden", "regulatory straightjacket"],
-    "P3": ["sensitive place", "island of manhattan", "polling place", "private property"],
-    "P4": ["in common use", "dangerous and unusual", "assault weapon",
-           "large-capacity magazine", "caetano"],
-    "P5": ["the people", "law-abiding", "responsible", "922(g)", "categorical",
-           "as-applied", "non-dangerous"],
-    "P6": ["1791", "1868", "reconstruction", "level of generality", "too late"],
-    "P7": ["footnote 9", "good moral character", "43 states", "exorbitant fees"],
-    "P8": ["presumptively lawful", "longstanding prohibition", "felons and the mentally ill",
-           "commercial sale"],
-}
+# Proposition spine (§4 lawyer-confirmed signal phrases) lives in
+# ``citator.propositions``. An edge "engages" a proposition when its passage
+# contains one of its phrases (substring, hyphen-normalised — see ``_norm``).
 
 # Treatment language. "Strong" = substantive negative/limiting engagement that, from
 # a binding court, earns deep analysis. The rest still count as treatment, weaker.
