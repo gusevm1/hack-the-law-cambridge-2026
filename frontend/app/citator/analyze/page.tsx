@@ -16,6 +16,7 @@ import {
   type TieredEdge,
   type PropositionsResult,
 } from "@/lib/api";
+import VerdictStep from "./steps/verdict";
 import { TreatmentStep } from "./steps/treatment";
 import { RelationStep } from "./steps/relation";
 
@@ -181,12 +182,7 @@ export default function Analyze() {
           {step === 3 && (
             <RelationStep data={props} loading={propsLoading} error={propsError} />
           )}
-          {step === 4 && (
-            <Placeholder
-              title="Verdict"
-              body="Feature 5 — risk relative to your intended use: maps the use to the propositions it depends on, then intersects with the compromised ones for a use-aware verdict."
-            />
-          )}
+          {step === 4 && <VerdictStep caseId={data.case.case_id} active={step === 4} />}
 
           {/* Nav */}
           <div className="mt-8 flex justify-between">
@@ -321,14 +317,5 @@ function EdgeCard({ edge }: { edge: TieredEdge }) {
         </ul>
       )}
     </li>
-  );
-}
-
-function Placeholder({ title, body }: { title: string; body: string }) {
-  return (
-    <section className="rounded-3xl border border-dashed border-black/15 p-6 dark:border-white/20">
-      <h2 className="text-xs font-semibold uppercase tracking-wide opacity-60">{title} · coming next</h2>
-      <p className="mt-2 text-sm opacity-70">{body}</p>
-    </section>
   );
 }

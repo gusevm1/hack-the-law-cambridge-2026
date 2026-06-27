@@ -294,3 +294,11 @@ export type VerdictResult = {
   close_to_overruled: CloseToOverruled;
   as_of: string;
 };
+
+export async function caseVerdict(
+  id: number,
+  use: string,
+  intent: string,
+): Promise<VerdictResult> {
+  return request(`/cases/${id}/verdict`, { method: "POST", body: { use, intent } });
+}

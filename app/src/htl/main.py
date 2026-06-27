@@ -32,6 +32,7 @@ from htl.routes import (
     resolve,
     risk,
     triage,
+    verdict,
 )
 from htl.settings import settings
 
@@ -87,3 +88,4 @@ app.include_router(classify.router)
 app.include_router(analyze.router)
 app.include_router(propositions.router)
 app.include_router(ask.router)
+app.include_router(verdict.router)
