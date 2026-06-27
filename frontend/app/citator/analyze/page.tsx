@@ -1,23 +1,22 @@
 "use client";
 
-// Citator analysis stepper — Feature 1 (Filter). Fetches GET /cases/{id}/triage
-// (public, no auth — see app/src/htl/routes/triage.py), which carries the
-// resolved case + every inbound edge tiered deep|shallow|mention. Resolve,
-// Citations, Treatment and Relation are live; Verdict is a placeholder for the
-// next feature. Defaults to Bruen (6480696). The case shown comes from the triage
+// Citator analysis stepper. Fetches GET /cases/{id}/triage (public, no auth — see
+// app/src/htl/routes/triage.py), which carries the resolved case + every inbound
+// edge tiered deep|shallow|mention. Resolve, Citations, Treatment (the deep
+// per-case read, Feature 3) and Relation (per-proposition evolution + risk,
+// Feature 4) are live; Verdict is a placeholder for Feature 5. Defaults to Bruen
+// (6480696). The case shown comes from the triage
 // response itself, so this never depends on the live /resolve or the DB.
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   caseTriage,
-  caseClassify,
   casePropositions,
   type TriageResult,
   type TieredEdge,
-  type ClassifyResult,
-  type ClassifiedEdge,
   type PropositionsResult,
 } from "@/lib/api";
+import { TreatmentStep } from "./steps/treatment";
 import { RelationStep } from "./steps/relation";
 
 const BRUEN_ID = 6480696;
@@ -68,9 +67,6 @@ export default function Analyze() {
   const [data, setData] = useState<TriageResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [classify, setClassify] = useState<ClassifyResult | null>(null);
-  const [classifyLoading, setClassifyLoading] = useState(false);
-  const [classifyError, setClassifyError] = useState<string | null>(null);
   const [props, setProps] = useState<PropositionsResult | null>(null);
   const [propsLoading, setPropsLoading] = useState(false);
   const [propsError, setPropsError] = useState<string | null>(null);
@@ -78,8 +74,7 @@ export default function Analyze() {
   async function load(id: number) {
     setLoading(true);
     setError(null);
-    setClassify(null); // stale classification belongs to the previous case
-    setProps(null); // ditto for the proposition aggregation
+    setProps(null); // stale aggregation belongs to the previous case
     try {
       setData(await caseTriage(id));
     } catch {
@@ -94,24 +89,9 @@ export default function Analyze() {
     load(BRUEN_ID);
   }, []);
 
-  // Lazily classify when the user reaches the Treatment step — the LLM is slow
-  // and costly, so don't pay for it until they look.
-  useEffect(() => {
-    if (step !== 2 || !data) return;
-    if (classify && classify.case.case_id === data.case.case_id) return;
-    let cancelled = false;
-    setClassifyLoading(true);
-    setClassifyError(null);
-    caseClassify(data.case.case_id)
-      .then((r) => !cancelled && setClassify(r))
-      .catch(() => !cancelled && setClassifyError(API_DOWN))
-      .finally(() => !cancelled && setClassifyLoading(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [step, data, classify]);
-
-  // Same lazy pattern for the Relation step — aggregate propositions on demand.
+  // Lazily aggregate propositions when the user reaches the Relation step — the
+  // backend read is slow, so don't pay for it until they look. (The Treatment step
+  // self-fetches /analyze on mount.)
   useEffect(() => {
     if (step !== 3 || !data) return;
     if (props && props.case.case_id === data.case.case_id) return;
@@ -197,16 +177,14 @@ export default function Analyze() {
         <>
           {step === 0 && <ResolveStep data={data} />}
           {step === 1 && <CitationsStep data={data} />}
-          {step === 2 && (
-            <TreatmentStep classify={classify} loading={classifyLoading} error={classifyError} />
-          )}
+          {step === 2 && <TreatmentStep caseId={data.case.case_id} />}
           {step === 3 && (
             <RelationStep data={props} loading={propsLoading} error={propsError} />
           )}
           {step === 4 && (
             <Placeholder
               title="Verdict"
-              body="Feature 4/5 — per-proposition signed risk → the composed operative rule: “Bruen, good law as modified by Rahimi (2024).”"
+              body="Feature 5 — risk relative to your intended use: maps the use to the propositions it depends on, then intersects with the compromised ones for a use-aware verdict."
             />
           )}
 
@@ -343,145 +321,6 @@ function EdgeCard({ edge }: { edge: TieredEdge }) {
         </ul>
       )}
     </li>
-  );
-}
-
-// Treatment tone by polarity — red (overruling), amber (limiting/doubting),
-// emerald (approving), muted (neutral/distinguished).
-const TREATMENT_TONE: Record<string, string> = {
-  overruled: "bg-red-500/15 text-red-600 dark:text-red-400",
-  reversed: "bg-red-500/15 text-red-600 dark:text-red-400",
-  abrogated: "bg-red-500/15 text-red-600 dark:text-red-400",
-  limited: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400",
-  criticised: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400",
-  questioned: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400",
-  followed: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
-  distinguished: "bg-black/[0.06] opacity-80 dark:bg-white/10",
-  "cited-neutral": "bg-black/[0.06] opacity-70 dark:bg-white/10",
-};
-
-function classifiedGroups(edges: ClassifiedEdge[]) {
-  const groups: Record<string, ClassifiedEdge[]> = {};
-  for (const e of edges) {
-    if (!e.classification) continue; // mentions weren't classified
-    const p = e.classification.proposition ?? NOISE;
-    (groups[p] ??= []).push(e);
-  }
-  const ordered = [...PROP_ORDER.filter((p) => groups[p]), ...(groups[NOISE] ? [NOISE] : [])];
-  return ordered.map((id) => ({
-    id,
-    label: id === NOISE ? "Whole-case / no single proposition" : `${id} · ${PROP_LABELS[id] ?? ""}`,
-    edges: groups[id],
-  }));
-}
-
-function TreatmentStep({
-  classify,
-  loading,
-  error,
-}: {
-  classify: ClassifyResult | null;
-  loading: boolean;
-  error: string | null;
-}) {
-  if (loading)
-    return <p className="text-sm opacity-50">Classifying edges with the model… (a few seconds)</p>;
-  if (error) return <p className="text-sm text-red-500">{error}</p>;
-  if (!classify) return null;
-  const groups = classifiedGroups(classify.edges);
-
-  return (
-    <section className="space-y-6">
-      <div className="rounded-3xl border border-black/10 p-6 dark:border-white/15">
-        <h2 className="text-xs font-semibold uppercase tracking-wide opacity-60">
-          Per-edge treatment — {classify.classified} of {classify.total} edges classified
-        </h2>
-        <p className="mt-2 text-sm opacity-70">
-          The {classify.counts.mention} <code>mention</code> edge
-          {classify.counts.mention === 1 ? "" : "s"} were filtered as noise and skipped — only the
-          deep + shallow edges earn the model. Each label is schema-constrained and its quote is
-          verified verbatim against the passage.
-        </p>
-      </div>
-
-      {groups.map((g) => (
-        <div key={g.id}>
-          <h3 className="mb-2 text-sm font-semibold">{g.label}</h3>
-          <ul className="space-y-3">
-            {g.edges.map((e, i) => (
-              <ClassifiedCard key={`${g.id}-${i}`} edge={e} />
-            ))}
-          </ul>
-        </div>
-      ))}
-    </section>
-  );
-}
-
-function ClassifiedCard({ edge }: { edge: ClassifiedEdge }) {
-  const c = edge.classification!;
-  const cc = edge.citing_case;
-  const tone = TREATMENT_TONE[c.treatment] ?? "bg-black/[0.06] dark:bg-white/10";
-
-  return (
-    <li className="rounded-2xl border border-black/10 p-4 dark:border-white/10">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${tone}`}>
-          {c.treatment}
-        </span>
-        {c.proposition && (
-          <span className="rounded-full bg-black/5 px-2 py-0.5 text-[11px] dark:bg-white/10">
-            {c.proposition}
-          </span>
-        )}
-        <span className="rounded-full border border-black/15 px-2 py-0.5 text-[11px] opacity-70 dark:border-white/20">
-          {c.holding_vs_dicta}
-        </span>
-        {c.attribution === "reported" ? (
-          <span
-            className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400"
-            title="echoing another opinion's treatment, not its own"
-          >
-            reported ⚠
-          </span>
-        ) : (
-          <span className="rounded-full bg-black/5 px-2 py-0.5 text-[11px] opacity-60 dark:bg-white/10">
-            self
-          </span>
-        )}
-        <span className="ml-auto text-[11px] opacity-50">{Math.round(c.confidence * 100)}% conf</span>
-      </div>
-
-      <p className="mt-2 text-sm font-medium">
-        {cc.case_name ?? "Unknown citing case"}
-        <span className="ml-2 text-xs font-normal opacity-60">
-          {[cc.court, cc.date_filed, edge.citation].filter(Boolean).join("  ·  ")}
-        </span>
-      </p>
-
-      <p className="mt-2 text-xs italic opacity-80">
-        “<HighlightedPassage passage={edge.passage} quote={c.quote} />”
-      </p>
-      <p className="mt-1 text-[10px] uppercase tracking-wide opacity-40">
-        {edge.tier} · {edge.source} · {c.model}
-      </p>
-    </li>
-  );
-}
-
-// The quote is verified verbatim backend-side; mark it in the passage. Falls back
-// to the plain passage if whitespace differs and an exact match isn't found.
-function HighlightedPassage({ passage, quote }: { passage: string; quote: string }) {
-  const i = quote ? passage.indexOf(quote) : -1;
-  if (i < 0) return <>{passage}</>;
-  return (
-    <>
-      {passage.slice(0, i)}
-      <mark className="rounded bg-yellow-300/50 px-0.5 not-italic dark:bg-yellow-300/30">
-        {quote}
-      </mark>
-      {passage.slice(i + quote.length)}
-    </>
   );
 }
 
