@@ -3,6 +3,7 @@
 Where the project is right now. Update this as reality moves.
 
 ## Now
+- **IN FLIGHT — Bruen DB seed from SQL dump.** Branch `feat/db-dump-loader`: `just load-dump <path>` + `app/scripts/load_dump.py` are ready (load `/Users/maximgusev/Downloads/citator-dump.sql` → 413 edges / 416 opinions / 396 real treatments → coloured graph + live signal, no CL). Parse-validated, not yet run on prod. Also now live: the **retrieval wire** (PR #43 — `/citations`+pipeline read the real DB with a Bruen-golden fallback; unified retrieve→analyze `/citator`) and the graph **hide-neutral** filter (#47); Cloud Run rev `htl-api-00006-xjq`. **Brief: `.claude/handoffs/db-dump-loader.md`.**
 - **Citator pipeline COMPLETE + DEPLOYED** — all five stages (Filter · Classify · Deep-analyzer · Propositions · Use-aware Verdict) shipped to `main` and live on Cloud Run (rev `htl-api-00005-rsn`) + Vercel. The `/citator/analyze` stepper walks the full Bruen flow end-to-end; the frontend is fully wired to the backend (every fetcher → a live endpoint, CORS `*`). Details under **Citator** below.
 - Scaffold + **production backend foundation shipped** (PR #6): Supabase JWT auth (ES256/JWKS), Cloud SQL Postgres (`users` + `messages`) via async SQLAlchemy + the Cloud SQL connector + Alembic, correlation IDs, structured JSON logging, and a uniform error envelope.
 - `POST /chat` is gated behind a verified user and persists both turns (user + assistant), stamped with the user + correlation id. `get_verifier` auto-selects Supabase (when JWKS+issuer set) else a dev/CI stub.
