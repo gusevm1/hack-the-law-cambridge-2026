@@ -8,7 +8,7 @@ class Settings(BaseSettings):
 
     gcp_project: str = "llm-law-cambridge26cbx-522"  # overridden by GCP_PROJECT on Cloud Run
     vertex_location: str = "global"  # Gemini lives here
-    gemini_model: str = "gemini-2.5-flash"  # default for any unmapped task
+    gemini_model: str = "gemini-3.5-flash"  # default for any unmapped task
 
     # --- Task → model routing (see llm/router.py) ---------------------------
     # No model id is hardcoded in feature code — call sites ask the router for
@@ -19,8 +19,8 @@ class Settings(BaseSettings):
     # and the live default path need no Claude/MaaS setup. claude_location/maas_location
     # are where the router *would* dispatch those providers (us-central1, not global).
     model_routes: dict[str, str] = {
-        "chat": "gemini-2.5-flash",  # /chat assistant (high volume, cheap)
-        "classify": "gemini-2.5-flash",  # F2 snippet treatment labels (cheap, high volume)
+        "chat": "gemini-3.5-flash",  # /chat assistant (high volume)
+        "classify": "gemini-3.5-flash",  # F2 snippet treatment labels (high volume)
         "analyze": "gemini-3.1-pro-preview",  # F3 deep full-opinion read — the one Pro task
         "narrative": "gemini-3.5-flash",  # F4 "what changed" prose
         "usemap": "gemini-3.5-flash",  # F5 use → proposition mapping
