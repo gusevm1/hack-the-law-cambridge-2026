@@ -70,9 +70,11 @@ export default function Citator() {
   }, []);
 
   useEffect(() => {
-    // Open on Bruen — the headline case. Deferred a tick so the initial demo
-    // fetch doesn't set state synchronously inside the effect body.
-    const t = setTimeout(() => void load(6480696), 0);
+    // Open on ?case=<id> (deep-link from /overview) or Bruen by default. Deferred a
+    // tick so the initial fetch doesn't set state synchronously inside the effect.
+    const param = Number(new URLSearchParams(window.location.search).get("case"));
+    const id = Number.isFinite(param) && param > 0 ? param : 6480696;
+    const t = setTimeout(() => void load(id), 0);
     return () => clearTimeout(t);
   }, [load]);
 
