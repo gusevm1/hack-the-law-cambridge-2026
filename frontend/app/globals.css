@@ -74,6 +74,11 @@ body {
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
+/* Tailwind v4 preflight resets <button> to cursor:default; restore the pointer. */
+button:not(:disabled) {
+  cursor: pointer;
+}
+
 /* ── Motion: one orchestrated page-load rise. Reduced-motion → instant. ─────── */
 @keyframes rise {
   from {
