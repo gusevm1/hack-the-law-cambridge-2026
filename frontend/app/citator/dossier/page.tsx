@@ -150,6 +150,7 @@ export default function Dossier() {
               <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">{risk.case.case_name}</h1>
               <p className="text-sm text-slate-400">{[risk.case.citation, risk.case.court, risk.case.date_filed].filter(Boolean).join("  ·  ")}</p>
               <p className="mt-3 text-sm text-slate-300">{clean(risk.risk_rationale)}</p>
+              <p className="mt-2 text-[11px] text-slate-500">Risk score 0 to 100: how likely this case is no longer safe to rely on for its core holdings. Lower is safer.</p>
               {risk.ground_truth.overruled_by && <p className="mt-2 text-xs font-medium text-red-400">Ground truth: overruled by {risk.ground_truth.overruled_by}</p>}
             </Card>
 
@@ -239,6 +240,7 @@ export default function Dossier() {
               <p className="text-sm text-slate-400">{[risk.case.citation, risk.case.court, risk.case.date_filed].filter(Boolean).join("  ·  ")}</p>
               {props?.operative_rule && <p className="mt-4 border-l-2 border-white/25 pl-3 text-lg font-semibold leading-snug text-white">{clean(props.operative_rule)}</p>}
               <p className="mt-3 text-sm text-slate-300">{clean(risk.risk_rationale)}</p>
+              <p className="mt-2 text-[11px] text-slate-500">Risk score 0 to 100: how likely this case is no longer safe to rely on for its core holdings. Lower is safer.</p>
             </Card>
 
             {/* USE-AWARE VERDICT — the actionable answer, up top */}
