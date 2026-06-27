@@ -71,7 +71,7 @@ export function SignIn() {
   return (
     <main className="min-h-dvh lg:grid lg:grid-cols-2">
       {/* LEFT: brand hero + USP. The --brand panel stays dark in both themes. */}
-      <section className="relative isolate flex flex-col justify-between gap-12 overflow-hidden bg-brand px-8 py-12 text-brand-foreground lg:min-h-dvh lg:px-14 lg:py-16">
+      <section className="relative isolate flex flex-col overflow-hidden bg-brand px-8 py-12 text-brand-foreground lg:min-h-dvh lg:px-14 lg:py-16">
         <SignInBackdrop />
 
         <div className="rise relative z-10 flex items-center gap-2.5">
@@ -79,7 +79,7 @@ export function SignIn() {
           <span className="text-sm font-semibold tracking-tight">CiteMeRight</span>
         </div>
 
-        <div className="relative z-10 max-w-xl">
+        <div className="relative z-10 mt-16 max-w-xl lg:my-auto">
           <h1
             className="rise text-[1.9rem] font-semibold leading-[1.12] tracking-tight sm:text-4xl lg:text-[2.7rem]"
             style={{ animationDelay: "70ms" }}
@@ -97,13 +97,6 @@ export function SignIn() {
             <span className="font-medium text-brand-foreground">Never a guess.</span>
           </p>
         </div>
-
-        <p
-          className="rise relative z-10 text-xs text-brand-foreground/40"
-          style={{ animationDelay: "210ms" }}
-        >
-          General information, not legal advice.
-        </p>
       </section>
 
       {/* RIGHT: sign in / create account. */}
