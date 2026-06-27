@@ -28,13 +28,10 @@ from __future__ import annotations
 import argparse
 import asyncio
 import html
-import json
 import os
 import re
-import ssl
 import urllib.error
 import urllib.parse
-import urllib.request
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any, Callable
@@ -42,11 +39,11 @@ from typing import Any, Callable
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from htl.citator.cl_client import cl_get_json
 from htl.db.citator import CitationEdge, ClOpinion
 from htl.db.engine import dispose_engine, get_session_factory
 
 CL_BASE = "https://www.courtlistener.com/api/rest/v4"
-USER_AGENT = "htl-citator/0.1 (hack-the-law-cambridge-2026)"
 
 # "Name|Citation" — the four landmark overrulings we seed the citator with.
 DEFAULT_CASES = [
@@ -58,15 +55,6 @@ DEFAULT_CASES = [
 
 _TAG = re.compile(r"<[^>]+>")
 _FED_APPELLATE = re.compile(r"^(ca\d+|cadc|cafc)$")
-
-# macOS Pythons often lack a system CA bundle; certifi (a transitive dep) is the
-# repo's standard fix (see the justfile's SSL_CERT_FILE dance for alembic).
-try:
-    import certifi
-
-    _SSL_CTX: ssl.SSLContext | None = ssl.create_default_context(cafile=certifi.where())
-except Exception:  # pragma: no cover - certifi always present here
-    _SSL_CTX = None
 
 Search = Callable[[dict[str, Any]], dict[str, Any]]
 
@@ -413,37 +401,19 @@ def seed_case(citation: str) -> CaseData | None:
 # --------------------------------------------------------------------------- #
 def http_get_json(url: str, *, token: str | None = None, timeout: int = 30,
                   retries: int = 4) -> dict[str, Any]:
-    """GET → JSON with explicit 429 backoff. Silent rate-limit truncation was a
-    recall killer (we'd just stop mid-graph); retry instead of dropping data."""
-    import time
-
-    for attempt in range(retries + 1):
-        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-        if token:
-            req.add_header("Authorization", f"Token {token}")
-        try:
-            with urllib.request.urlopen(req, timeout=timeout, context=_SSL_CTX) as resp:  # noqa: S310
-                return json.loads(resp.read().decode())
-        except urllib.error.HTTPError as e:
-            if e.code == 429 and attempt < retries:
-                wait = 20 * (attempt + 1)
-                print(f"    · 429 rate-limited; backing off {wait}s")
-                time.sleep(wait)
-                continue
-            raise
+    """All CourtListener access goes through the single-flight, globally-paced
+    client (lock + ≥20s spacing + 429 backoff) so concurrent callers can't race
+    the rate limit. See ``htl.citator.cl_client``."""
+    return cl_get_json(url, token=token, timeout=timeout, retries=retries)
 
 
 def make_search(token: str | None, sleep: float) -> Search:
-    """A paced search callable. With a token we pace ≤ 4 req/min (CL free tier)."""
-    import time
-
-    pace = max(sleep, 16.0) if token else sleep
+    """A search callable. Pacing is enforced globally by the paced client, so the
+    ``sleep`` arg is now vestigial (kept for CLI compatibility)."""
 
     def search(params: dict[str, Any]) -> dict[str, Any]:
         url = f"{CL_BASE}/search/?" + urllib.parse.urlencode(params)
-        data = http_get_json(url, token=token)
-        time.sleep(pace)
-        return data
+        return http_get_json(url, token=token)
 
     return search
 
@@ -499,7 +469,7 @@ async def enrich_full_text(case: CaseData, token: str, max_texts: int, pace: flo
         passage = passage_window(opinion_full_text(data), needles)
         if passage:
             row["plain_text"] = passage
-        await asyncio.sleep(pace)
+        # Pacing is enforced globally by the paced client (no local sleep needed).
 
 
 # --------------------------------------------------------------------------- #
