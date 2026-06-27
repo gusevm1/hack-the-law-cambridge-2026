@@ -149,6 +149,13 @@ def opinion_full_text(op: dict[str, Any]) -> str | None:
     return None
 
 
+_GENERIC_PARTY = frozenset(
+    {"inc", "co", "corp", "llc", "ltd", "assn", "of", "the", "et", "al", "ex",
+     "rel", "dept", "department", "commr", "commissioner", "united", "states",
+     "city", "county", "board", "v"}
+)
+
+
 def short_name(case_name: str | None) -> str | None:
     """The party surname a citing court uses ("…v. Bruen" → "Bruen"). Best-effort:
     the last alphabetic token after the final 'v.' (or the last token)."""
@@ -157,6 +164,32 @@ def short_name(case_name: str | None) -> str | None:
     tail = re.split(r"\bv\.?\s+", case_name)[-1]
     tokens = re.findall(r"[A-Za-z][A-Za-z'-]+", tail)
     return tokens[-1] if tokens else None
+
+
+def party_surnames(case_name: str | None) -> list[str]:
+    """Distinctive surname(s) a court might shorthand a case by — *both* sides, since
+    usage varies ("Roe v. Wade" → "Roe"; "NYSRPA v. Bruen" → "Bruen"). Drops generic
+    org/government tokens so the needle stays distinctive. Used for attribution."""
+    if not case_name:
+        return []
+    out: list[str] = []
+    for part in re.split(r"\bv\.?\s+", case_name):
+        part = re.split(r"\brevision", part.lower())[0]
+        toks = [t for t in re.findall(r"[a-z][a-z'-]+", part) if t not in _GENERIC_PARTY]
+        if toks:
+            out.append(toks[-1])
+    return out
+
+
+def case_key(name: str | None, year: int | None) -> tuple[str, int | None]:
+    """Identity for collapsing CourtListener *revision* clusters of one opinion
+    (defect #3): same case name (sans a 'Revisions: …' suffix) + same year. Three
+    'Wooden v. United States' clusters dated 2022-03-0{7,7,8} collapse to one."""
+    n = (name or "").lower()
+    n = re.split(r"\brevision", n)[0]
+    n = re.sub(r"[^a-z0-9 ]", " ", n)
+    n = re.sub(r"\s+", " ", n).strip()
+    return (n, year)
 
 
 def passage_window(text: str | None, needles: list[str], *, window: int = 1100) -> str | None:
@@ -244,11 +277,28 @@ def collect_case(search: Search, *, name: str, citation: str,
         if cid and cid != cited_id and cid not in seen:
             seen[cid] = r
 
-    # Prefer higher courts, then most recent, and cap the graph.
-    ranked = sorted(
+    # Prefer higher courts, then most recent, then collapse revision clusters of
+    # the same opinion (defect #3) before capping the graph.
+    ranked_all = sorted(
         seen.values(),
         key=lambda r: (court_rank(r.get("court_id")), -_date_ord(r)),
-    )[:max_edges]
+    )
+    ranked: list[dict[str, Any]] = []
+    seen_keys: set[tuple[str, int | None]] = set()
+    for r in ranked_all:
+        d = parse_date(r.get("dateFiled"))
+        key = case_key(r.get("caseName"), d.year if d else None)
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        ranked.append(r)
+    ranked = ranked[:max_edges]
+
+    dropped = len(ranked_all) - len(ranked)
+    if dropped:
+        # Recall-first (docs/citator-fixes-plan.md): we only collapse revision
+        # duplicates of the *same* opinion, never distinct citations — and we say so.
+        print(f"    · collapsed {dropped} revision-duplicate cluster(s) for {name}")
 
     for i, r in enumerate(ranked):
         cid = r["cluster_id"]
@@ -391,7 +441,7 @@ async def write_case(session: Any, case: CaseData) -> None:
 async def enrich_full_text(case: CaseData, token: str, max_texts: int, pace: float) -> None:
     """Token path: upgrade the bounded text subset to the passage *around the cite*
     pulled from the full opinion (not the whole opinion — see ``passage_window``)."""
-    needles = [n for n in (case.target.get("citation"), short_name(case.target.get("case_name")))
+    needles = [n for n in [case.target.get("citation"), *party_surnames(case.target.get("case_name"))]
                if n]
     for row in case.citers[:max_texts]:
         opid = case.opinion_ids.get(row["id"])
