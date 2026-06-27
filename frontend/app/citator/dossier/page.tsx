@@ -31,34 +31,14 @@ const SIG: Record<string, { txt: string; ring: string; glow: string; label: stri
 const sigOf = (s: string) => SIG[s] ?? SIG.unknown;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const riskBand = (r: number) => (r >= 0.66 ? "High" : r >= 0.33 ? "Moderate" : "Low");
-function trendNote(trend: RiskResult["trend"]) {
-  if (!trend || trend.length < 2) return "Too few dated treatments to show a trend.";
-  const first = trend[0].neg_share, last = trend[trend.length - 1].neg_share;
-  if (last > first + 0.05) return "Rising — courts have pushed back more lately.";
-  if (last < first - 0.05) return "Falling — less pushback in recent years.";
-  return "Stable — the level of pushback hasn't moved much.";
-}
+// strip em-dashes from displayed text (ours + API), per house style
+const clean = (t?: string | null) => (t ?? "").replace(/\s*—\s*/g, ", ");
 
 const STEPS = [
   { k: "triage", label: "Tiering every citation by depth" },
   { k: "props", label: "Tracking each holding through time" },
   { k: "rule", label: "Composing the operative rule" },
 ];
-
-function Sparkline({ trend }: { trend: RiskResult["trend"] }) {
-  if (!trend?.length) return <p className="text-xs text-slate-500">No dated treatments.</p>;
-  const w = 240, h = 44, n = trend.length;
-  const pts = trend.map((t, i) => [n === 1 ? w / 2 : (i / (n - 1)) * w, h - t.neg_share * h]);
-  const d = pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
-  return (
-    <svg width={w} height={h} className="overflow-visible">
-      <path d={`${d} L${w} ${h} L0 ${h} Z`} fill="url(#g)" opacity="0.25" />
-      <path d={d} fill="none" stroke="currentColor" strokeWidth="1.8" className="text-red-400" />
-      {pts.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r="2" className="fill-red-400" />)}
-      <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#f87171" /><stop offset="1" stopColor="transparent" /></linearGradient></defs>
-    </svg>
-  );
-}
 
 const Card = ({ children, className = "" }: { children: React.ReactNode; className?: string }) =>
   <section className={`rounded-2xl border border-white/10 bg-slate-900/50 ${className}`}>{children}</section>;
@@ -165,25 +145,13 @@ export default function Dossier() {
               <div className="flex items-center gap-2">
                 <span className={`h-2.5 w-2.5 rounded-full ${s.dot}`} />
                 <span className={`text-sm font-semibold uppercase tracking-wide ${s.txt}`}>{s.label}</span>
-                <span className={`ml-auto rounded-full px-2.5 py-1 text-[11px] font-medium ring-1 ${s.chip}`} title="How likely this case is no longer safe to rely on, 0–100.">{riskBand(risk.risk_score)} risk · {Math.round(risk.risk_score * 100)}/100</span>
+                <span className={`ml-auto rounded-full px-2.5 py-1 text-[11px] font-medium ring-1 ${s.chip}`}>{riskBand(risk.risk_score)} risk, {Math.round(risk.risk_score * 100)}/100</span>
               </div>
               <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">{risk.case.case_name}</h1>
               <p className="text-sm text-slate-400">{[risk.case.citation, risk.case.court, risk.case.date_filed].filter(Boolean).join("  ·  ")}</p>
-              <p className="mt-3 text-sm text-slate-300">{risk.risk_rationale}</p>
+              <p className="mt-3 text-sm text-slate-300">{clean(risk.risk_rationale)}</p>
               {risk.ground_truth.overruled_by && <p className="mt-2 text-xs font-medium text-red-400">Ground truth: overruled by {risk.ground_truth.overruled_by}</p>}
             </Card>
-
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-              <Card className="p-5">
-                <H>Treatment mix</H>
-                <div className="mt-3 flex gap-4 text-sm">
-                  <span><span className="text-lg font-semibold text-red-400">{risk.negative_treatments.length}</span> <span className="text-slate-400">negative</span></span>
-                  <span><span className="text-lg font-semibold text-green-400">{risk.positive_signal.approving_cites}</span> <span className="text-slate-400">approving</span></span>
-                  <span><span className="text-lg font-semibold text-white">{risk.positive_signal.total_citing}</span> <span className="text-slate-400">citing</span></span>
-                </div>
-              </Card>
-              <Card className="p-5"><H>Erosion over time</H><div className="mt-3"><Sparkline trend={risk.trend} /></div></Card>
-            </div>
 
             {graph && (
               <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_340px]">
@@ -265,18 +233,18 @@ export default function Dossier() {
               <div className="flex items-center gap-2">
                 <span className={`h-2.5 w-2.5 rounded-full ${s.dot}`} />
                 <span className={`text-sm font-semibold uppercase tracking-wide ${s.txt}`}>{s.label}</span>
-                <span className={`ml-auto rounded-full px-2.5 py-1 text-[11px] font-medium ring-1 ${s.chip}`} title="How likely this case is no longer safe to rely on, 0–100.">{riskBand(risk.risk_score)} risk · {Math.round(risk.risk_score * 100)}/100</span>
+                <span className={`ml-auto rounded-full px-2.5 py-1 text-[11px] font-medium ring-1 ${s.chip}`}>{riskBand(risk.risk_score)} risk, {Math.round(risk.risk_score * 100)}/100</span>
               </div>
               <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">{risk.case.case_name}</h1>
               <p className="text-sm text-slate-400">{[risk.case.citation, risk.case.court, risk.case.date_filed].filter(Boolean).join("  ·  ")}</p>
-              {props?.operative_rule && <p className="mt-4 border-l-2 border-white/25 pl-3 text-lg font-semibold leading-snug text-white">{props.operative_rule}</p>}
-              <p className="mt-3 text-sm text-slate-300">{risk.risk_rationale}</p>
+              {props?.operative_rule && <p className="mt-4 border-l-2 border-white/25 pl-3 text-lg font-semibold leading-snug text-white">{clean(props.operative_rule)}</p>}
+              <p className="mt-3 text-sm text-slate-300">{clean(risk.risk_rationale)}</p>
             </Card>
 
             {/* USE-AWARE VERDICT — the actionable answer, up top */}
             <Card className="cmr-fade border-sky-500/30 bg-sky-500/[0.04] p-6">
               <H>Will it hold for your argument?</H>
-              <p className="mt-1 text-sm text-slate-400">A case can be good law for one point and dead for another. Type the proposition you&apos;d rely on — we judge the risk for that exact use, not in the abstract.</p>
+              <p className="mt-1 text-sm text-slate-400">A case can be good law for one point and dead for another. Type the proposition you&apos;d rely on, and we judge the risk for that exact use, not in the abstract.</p>
               <form onSubmit={getVerdict} className="mt-4 flex gap-2">
                 <input value={use} onChange={(e) => setUse(e.target.value)}
                   placeholder={`e.g. cite ${(risk.case.case_name ?? "this").split(" ")[0]} for the public-carry right`}
@@ -295,7 +263,7 @@ export default function Dossier() {
                     <span className={`h-2.5 w-2.5 rounded-full ${verdict.real_risk ? "bg-red-500" : "bg-green-500"}`} />
                     <span className="text-sm font-semibold uppercase tracking-wide">{verdict.real_risk ? "Risky for this use" : "Safe for this use"}</span>
                   </div>
-                  <p className="mt-2 text-sm text-slate-300">{verdict.risk_explanation}</p>
+                  <p className="mt-2 text-sm text-slate-300">{clean(verdict.risk_explanation)}</p>
                   {verdict.close_to_overruled?.flag && <p className="mt-2 text-xs text-red-400">⚠ Close to overruled: {verdict.close_to_overruled.rationale}</p>}
                   <div className="mt-3 flex flex-wrap gap-2">
                     {verdict.per_proposition.map((p) => (
@@ -308,33 +276,28 @@ export default function Dossier() {
               )}
             </Card>
 
-            {/* bento: mix · trend · what we analysed */}
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-              <Card className="cmr-fade p-5">
-                <H>How later courts treated it</H>
-                <div className="mt-3 space-y-1.5 text-sm">
-                  <div className="flex justify-between"><span className="text-slate-400">Criticised / limited</span><span className="font-semibold text-red-400">{risk.negative_treatments.length}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-400">Followed / approved</span><span className="font-semibold text-green-400">{risk.positive_signal.approving_cites}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-400">Total citing cases</span><span className="font-semibold text-white">{risk.positive_signal.total_citing}</span></div>
-                </div>
-              </Card>
-              <Card className="cmr-fade p-5">
-                <H>Negativity trend</H>
-                <div className="mt-2"><Sparkline trend={risk.trend} /></div>
-                <p className="mt-1 text-xs text-slate-400">{trendNote(risk.trend)}</p>
-                <p className="mt-1 text-[11px] text-slate-600">Share of each year&apos;s citations that criticised or limited it.</p>
-              </Card>
-              <Card className="cmr-fade p-5">
-                <H>What we analysed</H>
-                {triage ? (
-                  <>
-                    <p className="mt-2 text-2xl font-semibold text-white">{triage.total}<span className="ml-1.5 text-sm font-normal text-slate-400">citing cases read</span></p>
-                    <p className="mt-2 text-xs text-slate-400">{triage.counts.deep} read in depth · {triage.counts.shallow} lightly · {triage.counts.mention} passing mentions.</p>
-                    <p className="mt-1 text-[11px] text-slate-600">This is what the findings below are built on.</p>
-                  </>
-                ) : <p className="mt-3 text-xs text-slate-500">—</p>}
-              </Card>
-            </div>
+            {/* what later courts said — one consolidated summary */}
+            {(() => {
+              const neg = risk.negative_treatments.length;
+              const appr = risk.positive_signal.approving_cites;
+              const total = risk.positive_signal.total_citing;
+              const neutral = Math.max(0, total - appr - neg);
+              const latest = [...risk.negative_treatments].sort((a, b) => (b.citing_case.date_filed ?? "").localeCompare(a.citing_case.date_filed ?? ""))[0];
+              return (
+                <Card className="cmr-fade p-5">
+                  <H>What later courts said</H>
+                  <p className="mt-2 text-sm text-slate-300">{triage ? `We read ${triage.total} of the ${total} citing cases in detail.` : `${total} cases cite this.`}</p>
+                  <div className="mt-3 grid grid-cols-3 gap-3 text-center">
+                    <div className="rounded-lg bg-red-500/10 p-3"><div className="text-2xl font-semibold text-red-400">{neg}</div><div className="mt-0.5 text-[11px] text-slate-400">criticised or limited</div></div>
+                    <div className="rounded-lg bg-green-500/10 p-3"><div className="text-2xl font-semibold text-green-400">{appr}</div><div className="mt-0.5 text-[11px] text-slate-400">followed or approved</div></div>
+                    <div className="rounded-lg bg-white/5 p-3"><div className="text-2xl font-semibold text-slate-200">{neutral}</div><div className="mt-0.5 text-[11px] text-slate-400">neutral mentions</div></div>
+                  </div>
+                  {latest
+                    ? <p className="mt-3 text-xs text-slate-500">Most recent pushback: {latest.citing_case.case_name}{latest.citing_case.date_filed ? ` (${latest.citing_case.date_filed.slice(0, 4)})` : ""}.</p>
+                    : <p className="mt-3 text-xs text-slate-500">No negative treatments on record.</p>}
+                </Card>
+              );
+            })()}
 
             {/* propositions at risk — how each holding fares under later cases */}
             {props?.propositions?.length ? (() => {
@@ -347,7 +310,7 @@ export default function Dossier() {
                     <H>Propositions at risk</H>
                     <span className="text-xs text-slate-500">{touched.length}/{ranked.length} touched · {gone} overruled</span>
                   </div>
-                  <p className="mt-1 text-xs text-slate-500">How each holding of this case fares under later decisions — sorted by risk.</p>
+                  <p className="mt-1 text-xs text-slate-500">How each holding of this case fares under later decisions, sorted by risk.</p>
                   <div className="mt-4 space-y-3">
                     {ranked.map((p) => {
                       const ps = sigOf(p.signal);
@@ -365,7 +328,7 @@ export default function Dossier() {
                             </div>
                             <span className={`w-12 text-right text-[11px] font-semibold tabular-nums ${ps.txt}`}>{pct}% risk</span>
                           </div>
-                          {p.what_changed && <p className="mt-2 text-xs text-slate-400">{p.what_changed}</p>}
+                          {p.what_changed && <p className="mt-2 text-xs text-slate-400">{clean(p.what_changed)}</p>}
                           {p.timeline.length > 0 && (
                             <div className="mt-2 flex flex-wrap items-center gap-1.5">
                               <span className="text-[10px] uppercase tracking-wide text-slate-600">Impacted by</span>
