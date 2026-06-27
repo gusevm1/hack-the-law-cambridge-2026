@@ -30,6 +30,14 @@ const SIG: Record<string, { txt: string; ring: string; glow: string; label: stri
 };
 const sigOf = (s: string) => SIG[s] ?? SIG.unknown;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const riskBand = (r: number) => (r >= 0.66 ? "High" : r >= 0.33 ? "Moderate" : "Low");
+function trendNote(trend: RiskResult["trend"]) {
+  if (!trend || trend.length < 2) return "Too few dated treatments to show a trend.";
+  const first = trend[0].neg_share, last = trend[trend.length - 1].neg_share;
+  if (last > first + 0.05) return "Rising — courts have pushed back more lately.";
+  if (last < first - 0.05) return "Falling — less pushback in recent years.";
+  return "Stable — the level of pushback hasn't moved much.";
+}
 
 const STEPS = [
   { k: "triage", label: "Tiering every citation by depth" },
@@ -128,6 +136,10 @@ export default function Dossier() {
       <style>{`
         @keyframes cmrFadeUp { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: none } }
         .cmr-fade { animation: cmrFadeUp .4s ease-out both }
+        @keyframes cmrShimmer { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
+        .cmr-shimmer { background: linear-gradient(90deg, rgba(56,189,248,.08) 0%, rgba(56,189,248,.55) 50%, rgba(56,189,248,.08) 100%); background-size: 200% 100%; animation: cmrShimmer 1.1s linear infinite }
+        @keyframes cmrBlink { 0%,100% { opacity:.3 } 50% { opacity:1 } }
+        .cmr-dot { animation: cmrBlink 1s ease-in-out infinite }
       `}</style>
       <div className="mx-auto w-full max-w-6xl px-5 py-8">
         {/* search */}
@@ -153,7 +165,7 @@ export default function Dossier() {
               <div className="flex items-center gap-2">
                 <span className={`h-2.5 w-2.5 rounded-full ${s.dot}`} />
                 <span className={`text-sm font-semibold uppercase tracking-wide ${s.txt}`}>{s.label}</span>
-                <span className="ml-auto text-xs text-slate-500">risk {risk.risk_score.toFixed(2)}</span>
+                <span className={`ml-auto rounded-full px-2.5 py-1 text-[11px] font-medium ring-1 ${s.chip}`} title="How likely this case is no longer safe to rely on, 0–100.">{riskBand(risk.risk_score)} risk · {Math.round(risk.risk_score * 100)}/100</span>
               </div>
               <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">{risk.case.case_name}</h1>
               <p className="text-sm text-slate-400">{[risk.case.citation, risk.case.court, risk.case.date_filed].filter(Boolean).join("  ·  ")}</p>
@@ -253,7 +265,7 @@ export default function Dossier() {
               <div className="flex items-center gap-2">
                 <span className={`h-2.5 w-2.5 rounded-full ${s.dot}`} />
                 <span className={`text-sm font-semibold uppercase tracking-wide ${s.txt}`}>{s.label}</span>
-                <span className="ml-auto text-xs text-slate-500">risk {risk.risk_score.toFixed(2)}</span>
+                <span className={`ml-auto rounded-full px-2.5 py-1 text-[11px] font-medium ring-1 ${s.chip}`} title="How likely this case is no longer safe to rely on, 0–100.">{riskBand(risk.risk_score)} risk · {Math.round(risk.risk_score * 100)}/100</span>
               </div>
               <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">{risk.case.case_name}</h1>
               <p className="text-sm text-slate-400">{[risk.case.citation, risk.case.court, risk.case.date_filed].filter(Boolean).join("  ·  ")}</p>
@@ -261,27 +273,64 @@ export default function Dossier() {
               <p className="mt-3 text-sm text-slate-300">{risk.risk_rationale}</p>
             </Card>
 
-            {/* bento: mix · erosion · depth */}
+            {/* USE-AWARE VERDICT — the actionable answer, up top */}
+            <Card className="cmr-fade border-sky-500/30 bg-sky-500/[0.04] p-6">
+              <H>Will it hold for your argument?</H>
+              <p className="mt-1 text-sm text-slate-400">A case can be good law for one point and dead for another. Type the proposition you&apos;d rely on — we judge the risk for that exact use, not in the abstract.</p>
+              <form onSubmit={getVerdict} className="mt-4 flex gap-2">
+                <input value={use} onChange={(e) => setUse(e.target.value)}
+                  placeholder={`e.g. cite ${(risk.case.case_name ?? "this").split(" ")[0]} for the public-carry right`}
+                  className="flex-1 rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm outline-none placeholder:text-slate-500 focus:border-sky-400/50" />
+                <button disabled={vLoading || !use.trim()} className="rounded-full bg-sky-500 px-6 text-sm font-semibold text-white transition hover:bg-sky-400 disabled:opacity-40">{vLoading ? "Judging…" : "Get verdict"}</button>
+              </form>
+              {vLoading && (
+                <div className="mt-4">
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/5"><div className="cmr-shimmer h-full w-full rounded-full" /></div>
+                  <p className="mt-2 text-xs text-sky-300">Judging your use against each holding<span className="cmr-dot">.</span><span className="cmr-dot" style={{ animationDelay: ".2s" }}>.</span><span className="cmr-dot" style={{ animationDelay: ".4s" }}>.</span></p>
+                </div>
+              )}
+              {verdict && !vLoading && (
+                <div className="cmr-fade mt-5">
+                  <div className={`flex items-center gap-2 ${verdict.real_risk ? "text-red-400" : "text-green-400"}`}>
+                    <span className={`h-2.5 w-2.5 rounded-full ${verdict.real_risk ? "bg-red-500" : "bg-green-500"}`} />
+                    <span className="text-sm font-semibold uppercase tracking-wide">{verdict.real_risk ? "Risky for this use" : "Safe for this use"}</span>
+                  </div>
+                  <p className="mt-2 text-sm text-slate-300">{verdict.risk_explanation}</p>
+                  {verdict.close_to_overruled?.flag && <p className="mt-2 text-xs text-red-400">⚠ Close to overruled: {verdict.close_to_overruled.rationale}</p>}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {verdict.per_proposition.map((p) => (
+                      <span key={p.proposition_id} className={`rounded-full px-2.5 py-1 text-[11px] ring-1 ${sigOf(p.signal).ring} ${sigOf(p.signal).txt}`}>
+                        {p.proposition_id}{p.relevant_to_use ? " ●" : ""} · {p.signal}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </Card>
+
+            {/* bento: mix · trend · what we analysed */}
             <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
               <Card className="cmr-fade p-5">
-                <H>Treatment mix</H>
+                <H>How later courts treated it</H>
                 <div className="mt-3 space-y-1.5 text-sm">
-                  <div className="flex justify-between"><span className="text-slate-400">Negative</span><span className="font-semibold text-red-400">{risk.negative_treatments.length}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-400">Approving</span><span className="font-semibold text-green-400">{risk.positive_signal.approving_cites}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-400">Total citing</span><span className="font-semibold text-white">{risk.positive_signal.total_citing}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Criticised / limited</span><span className="font-semibold text-red-400">{risk.negative_treatments.length}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Followed / approved</span><span className="font-semibold text-green-400">{risk.positive_signal.approving_cites}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Total citing cases</span><span className="font-semibold text-white">{risk.positive_signal.total_citing}</span></div>
                 </div>
               </Card>
-              <Card className="cmr-fade p-5"><H>Erosion over time</H><div className="mt-3"><Sparkline trend={risk.trend} /></div></Card>
               <Card className="cmr-fade p-5">
-                <H>Analysis depth</H>
+                <H>Negativity trend</H>
+                <div className="mt-2"><Sparkline trend={risk.trend} /></div>
+                <p className="mt-1 text-xs text-slate-400">{trendNote(risk.trend)}</p>
+                <p className="mt-1 text-[11px] text-slate-600">Share of each year&apos;s citations that criticised or limited it.</p>
+              </Card>
+              <Card className="cmr-fade p-5">
+                <H>What we analysed</H>
                 {triage ? (
                   <>
-                    <div className="mt-3 flex h-3 overflow-hidden rounded-full bg-white/10">
-                      <div className="bg-emerald-500" style={{ width: `${(triage.counts.deep / triage.total) * 100}%` }} />
-                      <div className="bg-yellow-400" style={{ width: `${(triage.counts.shallow / triage.total) * 100}%` }} />
-                      <div className="bg-slate-500" style={{ width: `${(triage.counts.mention / triage.total) * 100}%` }} />
-                    </div>
-                    <p className="mt-2 text-xs text-slate-400">{triage.counts.deep} deep · {triage.counts.shallow} shallow · {triage.counts.mention} mention</p>
+                    <p className="mt-2 text-2xl font-semibold text-white">{triage.total}<span className="ml-1.5 text-sm font-normal text-slate-400">citing cases read</span></p>
+                    <p className="mt-2 text-xs text-slate-400">{triage.counts.deep} read in depth · {triage.counts.shallow} lightly · {triage.counts.mention} passing mentions.</p>
+                    <p className="mt-1 text-[11px] text-slate-600">This is what the findings below are built on.</p>
                   </>
                 ) : <p className="mt-3 text-xs text-slate-500">—</p>}
               </Card>
@@ -340,54 +389,24 @@ export default function Dossier() {
               );
             })() : null}
 
-            {/* treatments + use-aware verdict */}
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-              {risk.negative_treatments.length > 0 && (
-                <Card className="cmr-fade p-5">
-                  <H>Negative treatments ({risk.negative_treatments.length})</H>
-                  <ul className="mt-3 space-y-3">
-                    {risk.negative_treatments.map((t, i) => (
-                      <li key={i} className="rounded-xl border border-white/10 p-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] font-medium text-red-300 ring-1 ring-red-500/40">{t.type}{t.on_other_grounds ? " · other grounds" : ""}</span>
-                          <span className="text-xs text-slate-300">{t.citing_case.case_name}{t.citing_case.date_filed ? ` · ${t.citing_case.date_filed}` : ""}</span>
-                          {t.confidence != null && <span className="ml-auto text-[11px] text-slate-500">{Math.round(t.confidence * 100)}%</span>}
-                        </div>
-                        {t.quote && <p className="mt-2 text-xs italic text-slate-400">“{t.quote}”</p>}
-                      </li>
-                    ))}
-                  </ul>
-                </Card>
-              )}
-
-              <Card className="cmr-fade border-dashed p-6">
-                <H>Verdict for your use</H>
-                <p className="mt-1 text-sm text-slate-400">Tell us the proposition you&apos;d cite it for — we judge the risk for that specific use.</p>
-                <form onSubmit={getVerdict} className="mt-4 flex gap-2">
-                  <input value={use} onChange={(e) => setUse(e.target.value)}
-                    placeholder={`e.g. cite ${(risk.case.case_name ?? "this").split(" ")[0]} for…`}
-                    className="flex-1 rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm outline-none placeholder:text-slate-500 focus:border-white/30" />
-                  <button disabled={vLoading || !use.trim()} className="rounded-full bg-white px-5 text-sm font-medium text-slate-900 transition hover:bg-slate-200 disabled:opacity-40">{vLoading ? "…" : "Judge"}</button>
-                </form>
-                {verdict && (
-                  <div className="cmr-fade mt-5">
-                    <div className={`flex items-center gap-2 ${verdict.real_risk ? "text-red-400" : "text-green-400"}`}>
-                      <span className={`h-2.5 w-2.5 rounded-full ${verdict.real_risk ? "bg-red-500" : "bg-green-500"}`} />
-                      <span className="text-sm font-semibold uppercase tracking-wide">{verdict.real_risk ? "Risky for this use" : "Safe for this use"}</span>
-                    </div>
-                    <p className="mt-2 text-sm text-slate-300">{verdict.risk_explanation}</p>
-                    {verdict.close_to_overruled?.flag && <p className="mt-2 text-xs text-red-400">⚠ Close to overruled: {verdict.close_to_overruled.rationale}</p>}
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {verdict.per_proposition.map((p) => (
-                        <span key={p.proposition_id} className={`rounded-full px-2.5 py-1 text-[11px] ring-1 ${sigOf(p.signal).ring} ${sigOf(p.signal).txt}`}>
-                          {p.proposition_id}{p.relevant_to_use ? " ●" : ""} · {p.signal}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
+            {/* negative treatments — the receipts */}
+            {risk.negative_treatments.length > 0 && (
+              <Card className="cmr-fade p-5">
+                <H>Negative treatments ({risk.negative_treatments.length})</H>
+                <ul className="mt-3 space-y-3">
+                  {risk.negative_treatments.map((t, i) => (
+                    <li key={i} className="rounded-xl border border-white/10 p-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] font-medium text-red-300 ring-1 ring-red-500/40">{t.type}{t.on_other_grounds ? " · other grounds" : ""}</span>
+                        <span className="text-xs text-slate-300">{t.citing_case.case_name}{t.citing_case.date_filed ? ` · ${t.citing_case.date_filed}` : ""}</span>
+                        {t.confidence != null && <span className="ml-auto text-[11px] text-slate-500">{Math.round(t.confidence * 100)}%</span>}
+                      </div>
+                      {t.quote && <p className="mt-2 text-xs italic text-slate-400">“{t.quote}”</p>}
+                    </li>
+                  ))}
+                </ul>
               </Card>
-            </div>
+            )}
           </div>
         )}
       </div>
