@@ -58,7 +58,7 @@ function CaseNode({ data }: NodeProps) {
   }
   const p = POLARITY[d.polarity];
   return (
-    <div className={`group w-44 rounded-xl border border-white/10 bg-slate-800/80 px-3 py-2 ring-1 ${p.ring} transition-transform hover:scale-[1.04]`}>
+    <div className={`group w-44 cursor-pointer rounded-xl border border-white/10 bg-slate-800/80 px-3 py-2 ring-1 ${p.ring} transition hover:z-10 hover:scale-[1.05] hover:border-white/40 hover:bg-slate-700/90`}>
       <Handle type="target" position={Position.Left} className="!opacity-0" />
       <div className="flex items-center gap-1.5">
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${p.dot}`} />
