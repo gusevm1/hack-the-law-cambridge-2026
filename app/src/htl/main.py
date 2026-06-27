@@ -21,7 +21,7 @@ from htl import logging_config
 from htl.correlation import CORRELATION_ID_HEADER, CorrelationIdMiddleware, get_correlation_id
 from htl.db.engine import dispose_engine
 from htl.errors import AppError, ValidationFailed
-from htl.routes import chat, health, resolve
+from htl.routes import chat, health, resolve, risk
 from htl.settings import settings
 
 _logger = structlog.get_logger("htl.main")
@@ -69,3 +69,4 @@ app.add_exception_handler(RequestValidationError, _handle_validation_error)  # t
 app.include_router(health.router)
 app.include_router(chat.router)
 app.include_router(resolve.router)
+app.include_router(risk.router)
