@@ -22,6 +22,7 @@ from htl.correlation import CORRELATION_ID_HEADER, CorrelationIdMiddleware, get_
 from htl.db.engine import dispose_engine
 from htl.errors import AppError, ValidationFailed
 from htl.routes import (
+    analyze,
     ask,
     chat,
     citations,
@@ -84,6 +85,7 @@ app.include_router(risk.router)
 app.include_router(citations.router)
 app.include_router(triage.router)
 app.include_router(classify.router)
+app.include_router(analyze.router)
 app.include_router(propositions.router)
 app.include_router(ask.router)
 app.include_router(verdict.router)
