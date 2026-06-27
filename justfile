@@ -34,8 +34,7 @@ gcp-bootstrap:
 migrate:
     #!/usr/bin/env bash
     set -euo pipefail
-    PROJECT_ID="${PROJECT_ID:-hack-the-law-cambridge-2026}"
-    REGION="${REGION:-europe-west1}"
+    source infra/env.sh  # PROJECT_ID, REGION — the account/project source of truth
     DB_INSTANCE="${DB_INSTANCE:-htl-db}"
     export INSTANCE_CONNECTION_NAME="${PROJECT_ID}:${REGION}:${DB_INSTANCE}"
     export DB_USER="${DB_USER:-htl_app}"

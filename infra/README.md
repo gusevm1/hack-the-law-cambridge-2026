@@ -1,9 +1,10 @@
 # Infra — account-portable GCP
 
-Two scripts, both parameterized by env vars. **Nothing is hardcoded to one login**, so the whole backend rebuilds on a different account by changing `PROJECT_ID` (and friends).
+Two scripts, both parameterized by env vars. **Nothing is hardcoded to one login**: the account/project lives in one place — [`env.sh`](env.sh) — and the whole backend rebuilds on a different account by editing it (or overriding `PROJECT_ID` and friends in the environment).
 
 | Script | Does |
 |---|---|
+| `env.sh` | **Source of truth** for `PROJECT_ID` + `REGION`. Sourced by the two scripts and `just migrate`. Edit here to switch accounts. |
 | `bootstrap.sh` | (optionally create project) → link billing → enable APIs (Run, Vertex, Cloud Build, Artifact Registry) → grant `roles/aiplatform.user` to the Cloud Run runtime SA. Idempotent. |
 | `deploy.sh` | `gcloud run deploy --source app/` (Cloud Build builds the Dockerfile), sets env vars, prints the service URL. |
 
@@ -11,8 +12,8 @@ Two scripts, both parameterized by env vars. **Nothing is hardcoded to one login
 
 | Var | Default | Used by |
 |---|---|---|
-| `PROJECT_ID` | `hack-the-law-cambridge-2026` | both |
-| `REGION` | `europe-west1` | both (Cloud Run region) |
+| `PROJECT_ID` | `llm-law-cambridge26cbx-522` (in `env.sh`) | both |
+| `REGION` | `europe-west1` (in `env.sh`) | both (Cloud Run region) |
 | `BILLING_ACCOUNT` | _(unset)_ | bootstrap (link billing) |
 | `CREATE_PROJECT` | `0` | bootstrap (set `1` to create the project) |
 | `ORG_ID` | _(unset)_ | bootstrap (org for a created project) |
