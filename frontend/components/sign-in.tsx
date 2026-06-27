@@ -69,32 +69,48 @@ export function SignIn() {
     "h-10 rounded-full border border-black/15 bg-transparent px-4 text-sm outline-none transition-colors placeholder:opacity-40 focus:border-black/40 dark:border-white/20 dark:focus:border-white/50";
 
   return (
-    <main className="relative min-h-dvh overflow-hidden">
-      <SignInBackdrop />
+    <main className="min-h-dvh lg:grid lg:grid-cols-2">
+      {/* LEFT: brand hero + USP. The --brand panel stays dark in both themes. */}
+      <section className="relative isolate flex flex-col justify-between gap-12 overflow-hidden bg-brand px-8 py-12 text-brand-foreground lg:min-h-dvh lg:px-14 lg:py-16">
+        <SignInBackdrop />
 
-      <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-5 py-12">
-        {/* Brand + value proposition */}
-        <div className="mb-8">
-          <div className="rise flex items-center gap-2.5">
-            <Mark />
-            <span className="text-sm font-semibold tracking-tight">CiteMeRight</span>
-          </div>
+        <div className="rise relative z-10 flex items-center gap-2.5">
+          <Mark />
+          <span className="text-sm font-semibold tracking-tight">CiteMeRight</span>
+        </div>
+
+        <div className="relative z-10 max-w-xl">
           <h1
-            className="rise mt-6 text-2xl font-semibold tracking-tight"
+            className="rise text-[1.9rem] font-semibold leading-[1.12] tracking-tight sm:text-4xl lg:text-[2.7rem]"
             style={{ animationDelay: "70ms" }}
           >
-            Know if a case is still good law before you cite it.
+            Reads the <span className="text-accent">citation graph</span> to tell you not just
+            whether a precedent <span className="text-good">holds</span>, but{" "}
+            <span className="whitespace-nowrap text-caution">how far</span>, and{" "}
+            <span className="text-accent">why</span>.
           </h1>
-          <p className="rise mt-2 text-sm opacity-60" style={{ animationDelay: "140ms" }}>
-            CiteMeRight reads the citation graph and tells you whether a precedent still
-            holds, grounded in the opinions that treat it, never a guess.
+          <p
+            className="rise mt-6 text-base leading-relaxed text-brand-foreground/65 sm:text-lg"
+            style={{ animationDelay: "140ms" }}
+          >
+            All grounded in the opinions that treat it.{" "}
+            <span className="font-medium text-brand-foreground">Never a guess.</span>
           </p>
         </div>
 
-        {/* Auth card */}
-        <div
-          className="rise rounded-3xl border border-black/10 bg-background/70 p-6 backdrop-blur-sm dark:border-white/15"
+        <p
+          className="rise relative z-10 text-xs text-brand-foreground/40"
           style={{ animationDelay: "210ms" }}
+        >
+          General information, not legal advice.
+        </p>
+      </section>
+
+      {/* RIGHT: sign in / create account. */}
+      <section className="flex items-center justify-center px-5 py-12 lg:min-h-dvh">
+        <div
+          className="rise w-full max-w-md rounded-3xl border border-black/10 bg-background/70 p-6 backdrop-blur-sm dark:border-white/15"
+          style={{ animationDelay: "120ms" }}
         >
           <h2 className="text-base font-semibold">
             {mode === "signin" ? "Sign in" : "Create your account"}
@@ -178,14 +194,7 @@ export function SignIn() {
             </button>
           </p>
         </div>
-
-        <p
-          className="rise mt-6 text-center text-xs opacity-40"
-          style={{ animationDelay: "280ms" }}
-        >
-          General information, not legal advice.
-        </p>
-      </div>
+      </section>
     </main>
   );
 }
