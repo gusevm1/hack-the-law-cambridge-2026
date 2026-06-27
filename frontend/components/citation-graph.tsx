@@ -97,16 +97,18 @@ const POLARITY_ORDER = { negative: 0, neutral: 1, positive: 2 } as const;
 export function CitationGraph({
   graph,
   onSelect,
-  negativeOnly,
+  hideNeutral,
 }: {
   graph: GraphResult;
   onSelect: (edge: GraphEdge) => void;
-  negativeOnly: boolean;
+  hideNeutral: boolean;
 }) {
   const { nodes, edges } = useMemo(() => {
     const meta = new Map(graph.nodes.map((n) => [n.case_id, n]));
     let citers = graph.edges.slice();
-    if (negativeOnly) citers = citers.filter((e) => e.polarity === "negative");
+    // Drop neutral citations so only edges that actually treat the case (negative
+    // or positive) remain — cuts through the grey when most cites are neutral.
+    if (hideNeutral) citers = citers.filter((e) => e.polarity !== "neutral");
     // Order by polarity then date so same-colour edges cluster into arcs.
     citers.sort(
       (a, b) =>
@@ -174,7 +176,7 @@ export function CitationGraph({
       });
     });
     return { nodes: flowNodes, edges: flowEdges };
-  }, [graph, negativeOnly]);
+  }, [graph, hideNeutral]);
 
   const onEdgeClick = useCallback(
     (_: unknown, edge: Edge) => {
