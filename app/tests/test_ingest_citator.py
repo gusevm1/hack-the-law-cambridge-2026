@@ -35,6 +35,27 @@ def test_parse_date() -> None:
     assert ingest.parse_date("not-a-date") is None
 
 
+def test_short_name_takes_surname_after_v() -> None:
+    assert ingest.short_name("New York State Rifle & Pistol Assn., Inc. v. Bruen") == "Bruen"
+    assert ingest.short_name("Roe v. Wade") == "Wade"
+    assert ingest.short_name(None) is None
+
+
+def test_passage_window_extracts_around_first_needle() -> None:
+    text = ("A" * 5000) + " see 597 U.S. 1 holding " + ("B" * 5000)
+    win = ingest.passage_window(text, ["597 U.S. 1"], window=100)
+    assert "597 U.S. 1" in win
+    assert len(win) <= 220  # ~2*window around the hit, not the whole 10k text
+    assert len(win) < len(text)
+
+
+def test_passage_window_falls_back_to_head_when_needle_absent() -> None:
+    text = "Z" * 10000
+    win = ingest.passage_window(text, ["Bruen", "597 U.S. 1"], window=100)
+    assert len(win) <= 200  # bounded head, never the full opinion
+    assert ingest.passage_window(None, ["x"]) is None
+
+
 # --- fixtures shaped like real CL v4 search payloads ------------------------ #
 _RESOLVE = {
     "results": [
