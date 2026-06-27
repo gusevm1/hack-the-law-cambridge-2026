@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 
 // A field of citation "nodes" with edges that slowly draw and dissolve: the
 // product semantic (cases citing cases) reduced to a calm decorative texture.
-// Ported from jobmatch-ch's sign-in backdrop, recoloured to our teal accent and
+// Ported from jobmatch-ch's sign-in backdrop, recoloured to neutral ink and
 // re-expressed in pure CSS/SVG (no motion dependency). Coordinates live in a
 // 1200x720 viewBox; the field is mask-faded so the auth card stays the subject.
 type Node = { x: number; y: number; r?: number };
@@ -62,7 +62,7 @@ export function SignInBackdrop() {
       {/* Hairline grid base, mask-faded at the edges. */}
       <div className="bg-grid bg-grid-fade absolute inset-0 opacity-[0.55]" />
 
-      {/* Two drifting teal glows in our brand gradient. */}
+      {/* Two drifting neutral glows for soft depth — theme-aware, no colour. */}
       <div
         className="animate-drift absolute"
         style={{
@@ -72,7 +72,7 @@ export function SignInBackdrop() {
           height: "60%",
           filter: "blur(60px)",
           background:
-            "radial-gradient(closest-side, oklch(0.74 0.12 195 / 0.40), transparent 70%)",
+            "radial-gradient(closest-side, color-mix(in oklab, var(--foreground) 7%, transparent), transparent 70%)",
         }}
       />
       <div
@@ -85,7 +85,7 @@ export function SignInBackdrop() {
           filter: "blur(80px)",
           animationDelay: "-6s",
           background:
-            "radial-gradient(closest-side, oklch(0.47 0.105 200 / 0.32), transparent 70%)",
+            "radial-gradient(closest-side, color-mix(in oklab, var(--foreground) 5%, transparent), transparent 70%)",
         }}
       />
 
@@ -107,7 +107,7 @@ export function SignInBackdrop() {
               x2={b.x}
               y2={b.y}
               pathLength={1}
-              stroke="var(--accent)"
+              stroke="var(--foreground)"
               strokeWidth={1}
               className="edge"
               style={{ "--dur": `${e.duration}s`, "--delay": `${e.delay}s` } as CSSProperties}
@@ -120,7 +120,7 @@ export function SignInBackdrop() {
             cx={n.x}
             cy={n.y}
             r={n.r ?? 2}
-            fill="var(--accent)"
+            fill="var(--foreground)"
             className="node"
             style={{ "--delay": `${(i % 6) * 0.6}s` } as CSSProperties}
           />

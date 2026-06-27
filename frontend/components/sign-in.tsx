@@ -191,7 +191,7 @@ export function SignIn() {
 
 function Mark() {
   return (
-    <span className="grid h-7 w-7 place-items-center rounded-[9px] bg-primary text-primary-foreground shadow-sm">
+    <span className="grid h-7 w-7 place-items-center rounded-[9px] bg-foreground text-background shadow-sm">
       <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden>
         <path d="M3 8.5l3 3 7-7.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
