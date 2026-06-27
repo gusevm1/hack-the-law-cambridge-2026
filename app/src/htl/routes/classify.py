@@ -18,10 +18,11 @@ from datetime import date
 
 from fastapi import APIRouter
 
-from htl.citator.golden import CITATIONS
+from htl.citator.retrieval import load_citations
 from htl.citator.triage import tier_edges
 from htl.llm.classify import EdgeClass, classify_edge
-from htl.models.api import CaseRef, ClassifiedEdge, ClassifyResponse, EdgeClassification
+from htl.models.api import ClassifiedEdge, ClassifyResponse, EdgeClassification
+from htl.routes.dependencies import DbSession
 
 router = APIRouter()
 
@@ -41,11 +42,10 @@ def _to_model(c: EdgeClass) -> EdgeClassification:
 
 
 @router.get("/cases/{case_id}/classify", response_model=ClassifyResponse)
-async def case_classify(case_id: int) -> ClassifyResponse:
-    hit = CITATIONS.get(case_id)
-    case = hit.case if hit is not None else CaseRef(case_id=case_id)
-    edges = hit.edges if hit is not None else []
-    triage = tier_edges(case, edges, today=date.today())
+async def case_classify(case_id: int, session: DbSession) -> ClassifyResponse:
+    cites = await load_citations(session, case_id)
+    case = cites.case
+    triage = tier_edges(case, cites.edges, today=date.today())
 
     async def _maybe(e: object) -> EdgeClass | None:
         if e.tier not in _CLASSIFY_TIERS:
