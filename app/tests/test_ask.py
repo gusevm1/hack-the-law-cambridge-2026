@@ -11,6 +11,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
+import htl.llm.vertex as vertex
 import htl.routes.ask as ask_route
 from htl.main import app
 from htl.models.api import (
@@ -98,7 +99,8 @@ def test_ask_runs_agentic_loop(monkeypatch: pytest.MonkeyPatch) -> None:
         _resp(text="Roe v. Wade was overruled by Dobbs; do not cite it as binding. "
               "General information, not legal advice."),
     ]
-    monkeypatch.setattr(ask_route, "get_client", lambda: _FakeClient(script))
+    fake = _FakeClient(script)  # one instance: the router re-fetches the client each round
+    monkeypatch.setattr(vertex, "_get_client", lambda: fake)
 
     async def fake_resolve(req, session):
         assert req.query == "Roe v. Wade"
@@ -129,7 +131,8 @@ def test_ask_falls_back_to_verdict_when_no_prose(monkeypatch: pytest.MonkeyPatch
         _resp(function_calls=[_fc("resolve_case", {"query": "Roe v. Wade"})]),
         _resp(function_calls=[_fc("get_case_risk", {"case_id": 108713})]),
     ] + [_resp(function_calls=[_fc("get_case_risk", {"case_id": 108713})])] * 3
-    monkeypatch.setattr(ask_route, "get_client", lambda: _FakeClient(script))
+    fake = _FakeClient(script)  # one instance: the router re-fetches the client each round
+    monkeypatch.setattr(vertex, "_get_client", lambda: fake)
     monkeypatch.setattr(ask_route, "resolve", lambda req, session: _coro(ROE_RESOLVE))
     monkeypatch.setattr(ask_route, "case_risk", lambda cid, session: _coro(ROE_RISK))
 

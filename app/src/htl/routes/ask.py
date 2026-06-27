@@ -18,12 +18,11 @@ from typing import Any
 from fastapi import APIRouter
 from google.genai import types
 
-from htl.llm.vertex import get_client
+from htl.llm import router as llm_router
 from htl.models.api import AskRequest, AskResponse, ResolveRequest
 from htl.routes.dependencies import DbSession
 from htl.routes.resolve import resolve
 from htl.routes.risk import case_risk
-from htl.settings import settings
 
 router = APIRouter()
 
@@ -110,7 +109,6 @@ async def ask(req: AskRequest, session: DbSession) -> AskResponse:
             return await get_case_risk(int(args["case_id"]))
         return {"error": f"unknown tool {name}"}
 
-    client = get_client()
     config = types.GenerateContentConfig(
         system_instruction=SYSTEM, tools=[_TOOL], temperature=0
     )
@@ -126,9 +124,8 @@ async def ask(req: AskRequest, session: DbSession) -> AskResponse:
 
     answer = ""
     for _ in range(MAX_ROUNDS):
-        resp = await client.aio.models.generate_content(
-            model=settings.ask_model, contents=contents, config=config
-        )
+        # Routed: task "ask" → settings.model_routes["ask"], with model fallback.
+        resp = await llm_router.generate("ask", contents=contents, config=config)
         fcs = resp.function_calls or []
         if not fcs:
             answer = resp.text or ""
