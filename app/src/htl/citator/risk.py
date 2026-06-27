@@ -41,6 +41,18 @@ POSITIVE = {"followed"}
 STRONG_NEGATIVE = {"overruled", "reversed", "abrogated"}
 # distinguished / cited-neutral → neutral (no polarity).
 
+
+def polarity_label(type_: str | None) -> str:
+    """Display polarity of a treatment type: 'negative' | 'positive' | 'neutral'.
+    The string mirror of ``_polarity`` (int), shared by /graph and the analyze gate
+    so 'neutral' means the same thing everywhere (distinguished + cited-neutral +
+    unclassified all read neutral)."""
+    if type_ in NEGATIVE:
+        return "negative"
+    if type_ in POSITIVE:
+        return "positive"
+    return "neutral"
+
 _FED_CIRCUIT = re.compile(r"^(ca\d+|cadc|cafc)$")
 
 # Thresholds (expert-tunable).

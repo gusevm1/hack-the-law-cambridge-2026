@@ -122,6 +122,7 @@ class Edge(BaseModel):
     source: str  # "graph" | "fulltext"
     matched_citation: str | None = None  # which parallel cite matched
     opinion_url: str | None = None
+    treatment: str | None = None  # persisted classification (most severe per citer), if any
 
 
 class CitationsResponse(BaseModel):
@@ -227,7 +228,8 @@ class AnalyzeResponse(BaseModel):
     case: CaseRef
     total: int
     counts: TriageCounts
-    analyzed: int  # edges that got the deep read (deep + shallow)
+    analyzed: int  # edges that got the deep read (deep + shallow, non-neutral)
+    skipped_neutral: int = 0  # worth-it tier but cited the target neutrally → not read
     edges: list[AnalyzedEdge]
 
 

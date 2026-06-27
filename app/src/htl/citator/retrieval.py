@@ -24,10 +24,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from htl.citator.golden import CITATIONS
-from htl.db.citator import CitationEdge, ClOpinion
+from htl.citator.risk import polarity_label
+from htl.db.citator import CitationEdge, ClOpinion, Treatment
 from htl.models.api import CaseRef, CitationsResponse, CitingCaseRef, Edge
 
 _SLUG = re.compile(r"[^a-z0-9]+")
+_SEVERITY = {"negative": 2, "positive": 1, "neutral": 0}
 
 
 def _opinion_url(citing_id: int, name: str | None) -> str:
@@ -35,6 +37,25 @@ def _opinion_url(citing_id: int, name: str | None) -> str:
     reasonable slug resolves to the canonical opinion URL (the receipt)."""
     slug = _SLUG.sub("-", (name or "case").lower()).strip("-") or "case"
     return f"https://www.courtlistener.com/opinion/{citing_id}/{slug}/"
+
+
+async def _worst_treatment_by_citer(session: AsyncSession, case_id: int) -> dict[int, str]:
+    """Most-severe persisted treatment type per citing case (negative > positive >
+    neutral). Matches /graph's pick-the-worst so the analyze gate and the graph
+    colour agree on whether a citer treats the target neutrally."""
+    rows = (
+        await session.execute(
+            select(Treatment.citing_id, Treatment.type).where(Treatment.cited_id == case_id)
+        )
+    ).all()
+    worst: dict[int, str] = {}
+    for citing_id, type_ in rows:
+        if type_ is None:
+            continue
+        cur = worst.get(citing_id)
+        if cur is None or _SEVERITY[polarity_label(type_)] > _SEVERITY[polarity_label(cur)]:
+            worst[citing_id] = type_
+    return worst
 
 
 async def load_citations(session: AsyncSession, case_id: int) -> CitationsResponse:
@@ -71,6 +92,7 @@ async def load_citations(session: AsyncSession, case_id: int) -> CitationsRespon
         court=case_row.court if case_row else None,
         date_filed=case_row.date_filed.isoformat() if case_row and case_row.date_filed else None,
     )
+    worst = await _worst_treatment_by_citer(session, case_id)
     edges = [
         Edge(
             citing_case=CitingCaseRef(
@@ -83,6 +105,7 @@ async def load_citations(session: AsyncSession, case_id: int) -> CitationsRespon
             source=r.source or "graph",
             matched_citation=None,
             opinion_url=_opinion_url(r.id, r.case_name),
+            treatment=worst.get(r.id),
         )
         for r in rows
     ]

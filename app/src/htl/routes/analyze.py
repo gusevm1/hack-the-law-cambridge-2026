@@ -20,6 +20,7 @@ from fastapi import APIRouter
 
 from htl.citator import golden
 from htl.citator.retrieval import load_citations
+from htl.citator.risk import polarity_label
 from htl.citator.triage import tier_edges
 from htl.llm.analyze import EdgeAnalysis, analyze_edge
 from htl.models.api import (
@@ -33,6 +34,13 @@ from htl.routes.dependencies import DbSession
 router = APIRouter()
 
 _ANALYZE_TIERS = {"deep", "shallow"}
+
+
+def _cites_neutrally(e: TieredEdge) -> bool:
+    """True when the citer's *persisted* treatment is explicitly neutral
+    (cited-neutral / distinguished). A bare cite that was never classified
+    (``treatment is None``) is unknown, not neutral, so it still gets read."""
+    return e.treatment is not None and polarity_label(e.treatment) == "neutral"
 
 
 def _to_edge(e: TieredEdge, a: EdgeAnalysis | None) -> AnalyzedEdge:
@@ -55,7 +63,9 @@ async def case_analyze(case_id: int, session: DbSession) -> AnalyzeResponse:
     triage = tier_edges(case, cites.edges, today=date.today())
 
     async def _maybe(e: TieredEdge) -> EdgeAnalysis | None:
-        if e.tier not in _ANALYZE_TIERS:
+        # Only deep-read citers that engage the target: skip worth-it tiers whose
+        # persisted treatment is neutral — a neutral cite has nothing to analyze.
+        if e.tier not in _ANALYZE_TIERS or _cites_neutrally(e):
             return None
         # Full opinion text when golden persisted it (rich, multi-proposition read),
         # else the DB-stored passage span — analyze_edge lowers to snippet depth when
@@ -67,10 +77,14 @@ async def case_analyze(case_id: int, session: DbSession) -> AnalyzeResponse:
     results = await asyncio.gather(*[_maybe(e) for e in triage.edges])
 
     analyzed_edges = [_to_edge(e, a) for e, a in zip(triage.edges, results, strict=True)]
+    skipped_neutral = sum(
+        1 for e in triage.edges if e.tier in _ANALYZE_TIERS and _cites_neutrally(e)
+    )
     return AnalyzeResponse(
         case=case,
         total=triage.total,
         counts=triage.counts,
         analyzed=sum(1 for a in results if a is not None),
+        skipped_neutral=skipped_neutral,
         edges=analyzed_edges,
     )
