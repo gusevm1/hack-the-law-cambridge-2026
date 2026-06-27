@@ -56,6 +56,23 @@ def test_passage_window_falls_back_to_head_when_needle_absent() -> None:
     assert ingest.passage_window(None, ["x"]) is None
 
 
+def test_case_key_collapses_revision_clusters() -> None:
+    # the three real Wooden revision clusters share a key → dedup to one
+    a = ingest.case_key("Wooden v. United States", 2022)
+    b = ingest.case_key("Wooden v. United States Revisions: 6/25/24", 2022)
+    assert a == b
+    # different year is a different case
+    assert ingest.case_key("Wooden v. United States", 1990) != a
+
+
+def test_party_surnames_takes_both_sides_and_drops_generic() -> None:
+    # both parties (usage varies: "Roe" vs "Wade"); used as passage-location needles
+    assert ingest.party_surnames("Roe v. Wade") == ["roe", "wade"]
+    # generic org/government tokens dropped, distinctive surname kept
+    assert "bruen" in ingest.party_surnames("New York State Rifle & Pistol Assn., Inc. v. Bruen")
+    assert ingest.party_surnames(None) == []
+
+
 # --- fixtures shaped like real CL v4 search payloads ------------------------ #
 _RESOLVE = {
     "results": [
