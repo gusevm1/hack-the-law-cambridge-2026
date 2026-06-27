@@ -12,14 +12,9 @@ from the menu always resolves even when Vertex is unavailable.
 
 from __future__ import annotations
 
-import json
-
-from google.genai import types
-
 from htl.citator.propositions import PROP_IDS, SPINE_TEXT
-from htl.llm import vertex
+from htl.llm import router
 from htl.models.api import UseMapping
-from htl.settings import settings
 
 # Proposition-aligned dropdown → default proposition id(s). These labels are the
 # canonical use options; the frontend dropdown mirrors them verbatim (ponytail:
@@ -72,17 +67,9 @@ async def _map_vertex(use: str, intent: str, defaults: list[str]) -> tuple[list[
         f"Default proposition hint for this use: {', '.join(defaults) or '(none)'}\n\n"
         "Which propositions does this use depend on?"
     )
-    resp = await vertex._get_client().aio.models.generate_content(
-        model=settings.gemini_model,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            system_instruction=_SYSTEM,
-            response_mime_type="application/json",
-            response_schema=_SCHEMA,
-            temperature=0.0,
-        ),
+    data = await router.complete(
+        "usemap", system=_SYSTEM, prompt=prompt, schema=_SCHEMA, temperature=0.0
     )
-    data = json.loads(resp.text or "{}")
     ids = _dedupe(data.get("engaged_propositions") or [])
     rationale = (data.get("rationale") or "").strip() or "Mapped by the model from the stated use."
     return ids, rationale

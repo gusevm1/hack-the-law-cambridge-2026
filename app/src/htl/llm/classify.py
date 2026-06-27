@@ -6,9 +6,9 @@ label, its scope, whether it's on other grounds, the exact justifying span, and 
 confidence. This is the value layer of the citator (the "is it still good law?"
 verdict feeds off these labels).
 
-Primary path is Gemini on Vertex AI (reusing ``llm.vertex``'s ADC client) with
-**structured output** (JSON schema) at temperature 0. If the model call fails
-(auth, quota, transient), we fall back to a deterministic keyword classifier so
+Primary path is Gemini on Vertex AI, routed through ``llm.router`` (task
+``"classify"``) with **structured output** (JSON schema) at temperature 0. If the
+model call fails (auth, quota, transient), we fall back to a deterministic keyword classifier so
 the pipeline always produces a row — the fallback is tagged ``model=
 "keyword-fallback"`` so its lower trust is visible downstream.
 
@@ -20,15 +20,11 @@ hardening pass.
 
 from __future__ import annotations
 
-import json
 import re
 from dataclasses import dataclass
 
-from google.genai import types
-
 from htl.citator.propositions import PROP_IDS, SPINE_TEXT
-from htl.llm import vertex
-from htl.settings import settings
+from htl.llm import router
 
 # The treatment vocabulary. Order is severity-ish (most adverse first); the risk
 # layer maps these to polarity, this module just emits the label.
@@ -103,17 +99,9 @@ async def _classify_vertex(passage: str, target_name: str | None, target_citatio
         f"PASSAGE from the citing opinion:\n\"\"\"\n{passage}\n\"\"\"\n\n"
         "Classify how the passage treats the TARGET."
     )
-    resp = await vertex._get_client().aio.models.generate_content(
-        model=settings.gemini_model,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            system_instruction=_SYSTEM,
-            response_mime_type="application/json",
-            response_schema=_SCHEMA,
-            temperature=0.0,
-        ),
+    data = await router.complete(
+        "classify", system=_SYSTEM, prompt=prompt, schema=_SCHEMA, temperature=0.0
     )
-    data = json.loads(resp.text or "{}")
 
     type_ = data.get("type") if data.get("type") in TYPES else "cited-neutral"
     scope = data.get("scope") if data.get("scope") in SCOPES else "whole-case"
@@ -131,7 +119,7 @@ async def _classify_vertex(passage: str, target_name: str | None, target_citatio
         on_other_grounds=bool(data.get("on_other_grounds", False)),
         quote=quote,
         confidence=confidence,
-        model=settings.gemini_model,
+        model=router.model_for("classify"),
     )
 
 
@@ -259,17 +247,9 @@ async def _classify_edge_vertex(
         f"PASSAGE from the citing opinion:\n\"\"\"\n{passage}\n\"\"\"\n\n"
         "Classify how the passage treats the TARGET, at the proposition level."
     )
-    resp = await vertex._get_client().aio.models.generate_content(
-        model=settings.gemini_model,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            system_instruction=_EDGE_SYSTEM,
-            response_mime_type="application/json",
-            response_schema=_EDGE_SCHEMA,
-            temperature=0.0,
-        ),
+    data = await router.complete(
+        "classify", system=_EDGE_SYSTEM, prompt=prompt, schema=_EDGE_SCHEMA, temperature=0.0
     )
-    data = json.loads(resp.text or "{}")
 
     treatment = data.get("treatment") if data.get("treatment") in TYPES else "cited-neutral"
     prop = data.get("proposition")
@@ -283,7 +263,7 @@ async def _classify_edge_vertex(
         confidence = max(0.0, min(1.0, float(data.get("confidence", 0.0))))
     except (TypeError, ValueError):
         confidence = 0.0
-    return EdgeClass(treatment, prop, hvd, attribution, quote, confidence, settings.gemini_model)
+    return EdgeClass(treatment, prop, hvd, attribution, quote, confidence, router.model_for("classify"))
 
 
 def classify_edge_keyword(passage: str, candidate_propositions: list[str] | None = None) -> EdgeClass:

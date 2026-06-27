@@ -29,17 +29,13 @@ long opinions falls short — add it then, not now.
 
 from __future__ import annotations
 
-import json
 import re
 from dataclasses import dataclass
 
-from google.genai import types
-
 from htl.citator.propositions import PROP_IDS, SPINE_TEXT
-from htl.llm import vertex
+from htl.llm import router
 from htl.llm.classify import TYPES, classify_edge
 from htl.models.api import CaseRef, TieredEdge
-from htl.settings import settings
 
 _HOLDING = ["holding", "dicta"]
 _ATTRIBUTION = ["self", "reported"]
@@ -154,20 +150,12 @@ async def _analyze_fulltext_vertex(
         f"FULL CITING OPINION:\n\"\"\"\n{full_text}\n\"\"\"\n\n"
         "Deep-read the opinion and report, per proposition, how it treats the TARGET."
     )
-    resp = await vertex._get_client().aio.models.generate_content(
-        model=settings.gemini_model,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            system_instruction=_FT_SYSTEM,
-            response_mime_type="application/json",
-            response_schema=_FT_SCHEMA,
-            temperature=0.0,
-        ),
+    data = await router.complete(
+        "analyze", system=_FT_SYSTEM, prompt=prompt, schema=_FT_SCHEMA, temperature=0.0
     )
-    data = json.loads(resp.text or "{}")
     findings = [_coerce_finding(d, full_text) for d in (data.get("findings") or [])]
     return EdgeAnalysis("full-text", findings, (data.get("case_summary") or "").strip(),
-                        settings.gemini_model)
+                        router.model_for("analyze"))
 
 
 # --------------------------------------------------------------------------- #
