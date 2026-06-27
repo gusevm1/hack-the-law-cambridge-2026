@@ -1,0 +1,1411 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CiteMeRight Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <style>
+    :root {
+      --background: 0 0% 100%;
+      --foreground: 0 0% 3.9%;
+      --card: 0 0% 100%;
+      --card-foreground: 0 0% 3.9%;
+      --popover: 0 0% 100%;
+      --popover-foreground: 0 0% 3.9%;
+      --primary: 0 0% 9%;
+      --primary-foreground: 0 0% 98%;
+      --secondary: 0 0% 96.1%;
+      --secondary-foreground: 0 0% 9%;
+      --muted: 0 0% 96.1%;
+      --muted-foreground: 0 0% 45.1%;
+      --accent: 0 0% 96.1%;
+      --accent-foreground: 0 0% 9%;
+      --border: 0 0% 89.8%;
+      --input: 0 0% 89.8%;
+      --ring: 0 0% 3.9%;
+      --radius: 0.5rem;
+      --dot-grid: 0 0% 72%;
+      --good: 154 27% 45%;
+      --warning: 40 34% 50%;
+      --danger: 350 38% 54%;
+      --danger-bg: 350 42% 96%;
+      --warning-bg: 40 48% 95%;
+      --good-bg: 154 34% 95%;
+      --analytics-mint: 154 27% 52%;
+      --analytics-lilac: 260 52% 64%;
+      --analytics-violet: 268 58% 58%;
+      --analytics-slate: 226 8% 54%;
+      --analytics-rose: 350 38% 58%;
+      --analytics-gold: 40 35% 55%;
+      --grey-wash: 220 8% 72%;
+    }
+
+    .dark {
+      --background: 0 0% 3.9%;
+      --foreground: 0 0% 98%;
+      --card: 0 0% 3.9%;
+      --card-foreground: 0 0% 98%;
+      --popover: 0 0% 3.9%;
+      --popover-foreground: 0 0% 98%;
+      --primary: 0 0% 98%;
+      --primary-foreground: 0 0% 9%;
+      --secondary: 0 0% 14.9%;
+      --secondary-foreground: 0 0% 98%;
+      --muted: 0 0% 14.9%;
+      --muted-foreground: 0 0% 63.9%;
+      --accent: 0 0% 14.9%;
+      --accent-foreground: 0 0% 98%;
+      --border: 0 0% 14.9%;
+      --input: 0 0% 14.9%;
+      --ring: 0 0% 83.1%;
+      --dot-grid: 0 0% 34%;
+      --good: 154 21% 62%;
+      --warning: 40 30% 66%;
+      --danger: 350 35% 68%;
+      --danger-bg: 350 24% 15%;
+      --warning-bg: 40 22% 16%;
+      --good-bg: 154 18% 15%;
+      --analytics-mint: 154 21% 66%;
+      --analytics-lilac: 260 45% 72%;
+      --analytics-violet: 268 48% 70%;
+      --analytics-slate: 226 7% 66%;
+      --analytics-rose: 350 34% 70%;
+      --analytics-gold: 40 31% 68%;
+      --grey-wash: 220 5% 42%;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: hsl(var(--background));
+      color: hsl(var(--foreground));
+      font-family: "Geist", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-variant-numeric: tabular-nums;
+      -webkit-font-smoothing: antialiased;
+      letter-spacing: 0;
+      overflow-x: hidden;
+    }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    a { color: inherit; }
+    .mono { font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .muted { color: hsl(var(--muted-foreground)); }
+    .shell { width: min(100% - 32px, 1180px); margin: 0 auto; }
+    .page { min-height: 100vh; padding: 20px 0 56px; position: relative; overflow: hidden; }
+
+    /* Dashboard background component: Dot grid */
+    .dot-grid {
+      position: fixed;
+      inset: 0;
+      z-index: -2;
+      overflow: hidden;
+      pointer-events: none;
+    }
+    .dot-grid::before {
+      content: "";
+      position: absolute;
+      inset: -24px;
+      background-image: radial-gradient(circle, hsl(var(--dot-grid) / .56) 1.15px, transparent 1.35px);
+      background-position: center;
+      background-size: 22px 22px;
+      opacity: .74;
+      transition: opacity .18s ease, mask-image .18s ease, -webkit-mask-image .18s ease;
+    }
+    .dot-hover .dot-grid::before {
+      -webkit-mask-image: radial-gradient(circle 168px at var(--dot-x, 50vw) var(--dot-y, 50vh), transparent 0 58px, rgb(0 0 0 / .3) 104px, black 168px);
+      mask-image: radial-gradient(circle 168px at var(--dot-x, 50vw) var(--dot-y, 50vh), transparent 0 58px, rgb(0 0 0 / .3) 104px, black 168px);
+    }
+    .dot-grid::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle 210px at var(--dot-x, 50vw) var(--dot-y, 50vh), hsl(var(--background) / .34), transparent 72%);
+      opacity: 0;
+      transition: opacity .18s ease;
+    }
+    .dot-hover .dot-grid::after {
+      opacity: 1;
+    }
+    .page::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background:
+        radial-gradient(circle at 50% 12%, hsl(var(--background) / .45), transparent 30%),
+        linear-gradient(180deg, hsl(var(--background) / .15), hsl(var(--background) / .82) 78%);
+      pointer-events: none;
+    }
+
+    /* Navigation bar component: FloatingHeader */
+    .floating-header {
+      position: sticky;
+      top: 20px;
+      z-index: 50;
+      margin: 0 auto 28px;
+      width: min(100% - 32px, 768px);
+      border-radius: var(--radius);
+      border: 1px solid hsl(var(--border));
+      background: hsl(var(--background) / .95);
+      box-shadow: 0 8px 28px hsl(0 0% 0% / .08);
+      backdrop-filter: blur(16px);
+    }
+    .floating-header nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 6px;
+    }
+    .brand, .nav-links, .nav-actions { display: flex; align-items: center; gap: 8px; }
+    .brand {
+      border: 0;
+      background: transparent;
+      color: hsl(var(--foreground));
+      border-radius: 6px;
+      padding: 5px 8px;
+      transition: background .12s ease;
+    }
+    .brand:hover { background: hsl(var(--accent)); }
+    .brand-mark {
+      width: 20px;
+      height: 20px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .brand-name { font-family: "Geist Mono", ui-monospace, monospace; font-size: 15px; font-weight: 800; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      height: 34px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      padding: 0 12px;
+      background: transparent;
+      color: hsl(var(--foreground));
+      font-size: 13px;
+      font-weight: 500;
+      transition: background .12s ease, border-color .12s ease, color .12s ease, transform .12s ease;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .btn:hover { background: hsl(var(--accent)); }
+    .btn:active { transform: scale(.98); }
+    .btn-primary {
+      background: hsl(var(--primary));
+      color: hsl(var(--primary-foreground));
+      border-color: hsl(var(--primary));
+    }
+    .btn-primary:hover { background: hsl(var(--primary) / .9); }
+    .btn-outline { border-color: hsl(var(--border)); background: hsl(var(--background)); }
+    .btn-icon { width: 34px; padding: 0; }
+    .btn-large { height: 44px; padding: 0 18px; font-weight: 600; }
+    .case-switcher {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      padding: 2px;
+      border: 1px solid hsl(var(--border));
+      border-radius: 8px;
+      background: hsl(var(--muted) / .72);
+    }
+    .case-pill {
+      height: 28px;
+      border: 0;
+      border-radius: 6px;
+      padding: 0 9px;
+      background: transparent;
+      color: hsl(var(--muted-foreground));
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .case-pill.active {
+      background: hsl(var(--background));
+      color: hsl(var(--foreground));
+      box-shadow: 0 1px 2px hsl(0 0% 0% / .08);
+    }
+
+    /* Card component */
+    .card {
+      border-radius: var(--radius);
+      border: 1px solid hsl(var(--border));
+      background: hsl(var(--card));
+      color: hsl(var(--card-foreground));
+      box-shadow: 0 1px 2px hsl(0 0% 0% / .05);
+      min-width: 0;
+    }
+    .card-header { display: flex; flex-direction: column; gap: 6px; padding: 24px; min-width: 0; }
+    .card-title { margin: 0; font-size: 22px; line-height: 1; font-weight: 650; letter-spacing: 0; }
+    .card-description { margin: 0; color: hsl(var(--muted-foreground)); font-size: 14px; line-height: 1.55; }
+    .card-content { padding: 0 24px 24px; min-width: 0; }
+    .card-footer { display: flex; align-items: center; gap: 10px; padding: 0 24px 24px; }
+
+    .hero {
+      display: grid;
+      min-height: calc(100vh - 116px);
+      place-items: center;
+      padding: 36px 0 80px;
+    }
+    .search-card { width: min(100%, 660px); background: hsl(var(--card) / .92); backdrop-filter: blur(16px); }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      border: 1px solid hsl(var(--border));
+      border-radius: 999px;
+      padding: 5px 10px;
+      color: hsl(var(--muted-foreground));
+      font-size: 12px;
+      font-weight: 600;
+      width: fit-content;
+    }
+    .hero h1 {
+      margin: 14px 0 0;
+      font-size: clamp(36px, 7vw, 58px);
+      line-height: .98;
+      font-weight: 780;
+      letter-spacing: 0;
+    }
+    .search-row { display: flex; gap: 8px; margin-top: 24px; }
+    .input-wrap { position: relative; flex: 1; min-width: 0; }
+    .input-wrap i { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: hsl(var(--muted-foreground)); }
+    input {
+      width: 100%;
+      height: 44px;
+      border: 1px solid hsl(var(--input));
+      border-radius: 7px;
+      background: hsl(var(--background));
+      color: hsl(var(--foreground));
+      padding: 0 13px;
+      outline: none;
+      transition: border-color .12s ease, box-shadow .12s ease;
+    }
+    .input-wrap input { padding-left: 38px; }
+    input:focus { border-color: hsl(var(--ring) / .7); box-shadow: 0 0 0 2px hsl(var(--ring) / .12); }
+    .demo-row { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
+    .demo-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid hsl(var(--border));
+      border-radius: 999px;
+      background: hsl(var(--background));
+      color: hsl(var(--muted-foreground));
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 550;
+    }
+    .demo-chip:hover { background: hsl(var(--accent)); color: hsl(var(--foreground)); }
+    .dot { width: 7px; height: 7px; border-radius: 999px; background: hsl(var(--muted-foreground)); }
+    .feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 32px; }
+    .mini-card { padding: 15px; }
+    .mini-card h3 { margin: 10px 0 4px; font-size: 13px; }
+    .mini-card p { margin: 0; color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.45; }
+    .icon-box {
+      width: 30px;
+      height: 30px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      background: hsl(var(--muted));
+      color: hsl(var(--muted-foreground));
+    }
+
+    .case-hero { padding: 2px 0 24px; }
+    .case-card .card-header { gap: 14px; }
+    .case-title-row { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; }
+    .case-title-row > * { min-width: 0; }
+    .case-title { margin: 0; font-size: clamp(24px, 4vw, 40px); line-height: 1.05; font-weight: 760; max-width: 760px; }
+    .metadata { display: flex; flex-wrap: wrap; gap: 8px; color: hsl(var(--muted-foreground)); font-size: 13px; }
+    .metadata span { display: inline-flex; align-items: center; gap: 7px; }
+    .review-steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 0 24px 24px; }
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      border: 1px solid hsl(var(--border));
+      border-radius: 8px;
+      padding: 10px;
+      color: hsl(var(--muted-foreground));
+      font-size: 12px;
+      font-weight: 600;
+      background: hsl(var(--background));
+    }
+    .step-number {
+      width: 22px;
+      height: 22px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      background: hsl(var(--foreground));
+      color: hsl(var(--background));
+      font-size: 11px;
+    }
+
+    .review-grid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; align-items: start; }
+    .stack { display: grid; gap: 16px; }
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      padding: 18px 20px;
+      border-bottom: 1px solid hsl(var(--border));
+      min-width: 0;
+    }
+    .section-head h2 { margin: 0; font-size: 15px; font-weight: 650; }
+    .section-head p { margin: 3px 0 0; color: hsl(var(--muted-foreground)); font-size: 12px; }
+    .count-badge {
+      border-radius: 999px;
+      background: hsl(var(--muted));
+      color: hsl(var(--muted-foreground));
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    /* Analytics/data component */
+    .candy-bg {
+      background-color: hsl(0 0% 96%, 2%);
+      background-image: linear-gradient(
+        135deg,
+        hsl(0 0% 96%) 25%,
+        transparent 25.5%,
+        transparent 50%,
+        hsl(0 0% 96%) 50.5%,
+        hsl(0 0% 96%) 75%,
+        transparent 75.5%,
+        transparent
+      );
+      background-size: 10px 10px;
+    }
+    .dark .candy-bg {
+      background-color: hsl(0 0% 11%);
+      background-image: linear-gradient(135deg, hsl(0 0% 13%) 25%, transparent 25.5%, transparent 50%, hsl(0 0% 13%) 50.5%, hsl(0 0% 13%) 75%, transparent 75.5%, transparent);
+    }
+    .stats-wrap { padding: 20px; }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      height: 280px;
+      align-items: stretch;
+    }
+    .bar-chart {
+      --bar-bg: hsl(var(--analytics-slate));
+      --bar-fg: hsl(0 0% 99%);
+      --bar-value-bg: hsl(0 0% 100% / .24);
+      position: relative;
+      height: 100%;
+      width: 100%;
+    }
+    .bar-chart[data-tone="approving"] {
+      --bar-bg: hsl(var(--analytics-mint));
+      --bar-fg: hsl(0 0% 98%);
+      --bar-value-bg: hsl(0 0% 100% / .25);
+    }
+    .bar-chart[data-tone="neutral"] {
+      --bar-bg: hsl(var(--analytics-slate));
+      --bar-fg: hsl(0 0% 100%);
+      --bar-value-bg: hsl(0 0% 100% / .24);
+    }
+    .bar-chart[data-tone="negative"] {
+      --bar-bg: hsl(var(--analytics-rose));
+      --bar-fg: hsl(0 0% 98%);
+      --bar-value-bg: hsl(0 0% 100% / .23);
+    }
+    .bar-chart[data-tone="depth"] {
+      --bar-bg: hsl(var(--analytics-lilac));
+      --bar-fg: hsl(0 0% 99%);
+      --bar-value-bg: hsl(0 0% 100% / .23);
+    }
+    .dark .bar-chart { --bar-fg: hsl(0 0% 7%); --bar-value-bg: hsl(0 0% 100% / .22); }
+    .bar-shell { position: relative; height: calc(100% - 28px); width: 100%; overflow: hidden; border-radius: 40px; }
+    .bar-fill {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      min-height: 72px;
+      border-radius: 40px;
+      background-color: var(--bar-bg);
+      background-image: linear-gradient(180deg, hsl(var(--grey-wash) / .24), hsl(var(--grey-wash) / .14));
+      color: var(--bar-fg);
+      padding: 12px;
+      animation: rise .55s cubic-bezier(.22, .61, .36, 1) both;
+      box-shadow: inset 0 1px 0 hsl(0 0% 100% / .24), inset 0 -18px 36px hsl(0 0% 0% / .07);
+    }
+    .bar-value {
+      display: flex;
+      height: 44px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      background: var(--bar-value-bg);
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+    .bar-label { margin: 9px auto 0; width: fit-content; color: hsl(var(--muted-foreground)); font-size: 12px; text-align: center; }
+    @keyframes rise { from { opacity: 0; transform: translateY(40px); height: 0; } to { opacity: 1; transform: translateY(0); } }
+
+    /* DataGridContainer component */
+    .data-grid {
+      display: grid;
+      width: 100%;
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: hsl(var(--background));
+    }
+    .treatment-grid-wrap { padding: 0 20px 20px; }
+    .treatment-grid-header,
+    .treatment-grid-row {
+      display: grid;
+      grid-template-columns: minmax(112px, .8fr) minmax(0, 1fr) 92px;
+      align-items: center;
+      gap: 12px;
+    }
+    .treatment-grid-header {
+      min-height: 38px;
+      padding: 0 12px;
+      border-bottom: 1px solid hsl(var(--border));
+      background: hsl(var(--muted) / .62);
+      color: hsl(var(--muted-foreground));
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    .treatment-grid-body { display: grid; }
+    .treatment-grid-row {
+      min-height: 44px;
+      padding: 8px 12px;
+      border-bottom: 1px solid hsl(var(--border));
+      transition: background .12s ease;
+    }
+    .treatment-grid-row:last-child { border-bottom: 0; }
+    .treatment-grid-row:hover { background: hsl(var(--accent) / .72); }
+    .treatment-grid-cell { min-width: 0; }
+    .treatment-grid-count {
+      justify-self: end;
+      font-size: 13px;
+      font-weight: 650;
+    }
+    .treatment-meter {
+      height: 8px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: hsl(var(--muted));
+    }
+    .treatment-meter span {
+      display: block;
+      height: 100%;
+      min-width: 6px;
+      border-radius: inherit;
+      opacity: .86;
+    }
+    .inline-analytics-shell {
+      background: hsl(var(--background));
+      padding: 16px;
+      overflow-x: auto;
+    }
+    .inline-analytics-table { min-width: 600px; }
+    .inline-analytics-table th,
+    .inline-analytics-table td {
+      vertical-align: middle;
+    }
+    .inline-analytics-table th {
+      color: hsl(var(--muted-foreground));
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0;
+      text-transform: none;
+    }
+    .inline-analytics-table td {
+      font-size: 14px;
+    }
+    .inline-analytics-table tfoot td {
+      border-bottom: 0;
+      background: hsl(var(--muted) / .38);
+      font-weight: 650;
+    }
+    .analytics-head {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .header-progress {
+      height: 4px;
+      margin-top: 4px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: hsl(var(--muted));
+    }
+    .header-progress span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: hsl(var(--foreground));
+    }
+    .trend-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+    }
+    .trend-icon.positive { color: #22c55e; }
+    .trend-icon.negative { color: #ef4444; }
+    .inline-analytics-table .font-medium { font-weight: 500; }
+    .inline-analytics-table .trend-cell { text-align: right; }
+    .inline-analytics-caption {
+      margin: 16px 0 0;
+      text-align: center;
+      color: hsl(var(--muted-foreground));
+      font-size: 14px;
+    }
+    .tag {
+      display: inline-flex;
+      width: fit-content;
+      align-items: center;
+      border-radius: 6px;
+      padding: 3px 8px;
+      border: 1px solid hsl(var(--border));
+      background: hsl(var(--background));
+      color: hsl(var(--muted-foreground));
+      font-size: 11px;
+      font-weight: 650;
+    }
+
+    /* TreeView component */
+    .tree-view {
+      width: 100%;
+      border: 1px solid hsl(var(--border));
+      border-radius: 12px;
+      background: hsl(var(--background));
+      padding: 8px;
+      overflow-x: auto;
+    }
+    .tree-node { user-select: none; }
+    .tree-row {
+      display: flex;
+      align-items: center;
+      min-height: 36px;
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: background .2s ease;
+      position: relative;
+      border-radius: 6px;
+      margin: 0 4px;
+      color: hsl(var(--foreground));
+    }
+    .tree-row:hover { background: hsl(var(--accent) / .5); }
+    .tree-row.selected { background: hsl(var(--accent) / .8); }
+    .tree-line { position: absolute; top: 0; bottom: 0; border-left: 1px solid hsl(var(--border) / .45); pointer-events: none; }
+    .tree-elbow { position: absolute; top: 50%; border-top: 1px solid hsl(var(--border) / .45); transform: translateY(-1px); pointer-events: none; }
+    .tree-icon, .tree-chevron {
+      width: 16px;
+      height: 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 8px;
+      color: hsl(var(--muted-foreground));
+      flex: 0 0 16px;
+    }
+    .tree-chevron { margin-right: 4px; transition: transform .2s ease; }
+    .tree-row.open .tree-chevron { transform: rotate(90deg); }
+    .tree-label { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 500; }
+    .tree-meta { color: hsl(var(--muted-foreground)); font-size: 12px; margin-left: 8px; white-space: nowrap; }
+
+    .table-tools { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; min-width: 760px; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid hsl(var(--border)); padding: 13px 14px; text-align: left; vertical-align: top; }
+    th { color: hsl(var(--muted-foreground)); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
+    td { font-size: 13px; line-height: 1.45; }
+    tr:hover td { background: hsl(var(--accent) / .5); }
+    .summary-cell { color: hsl(var(--muted-foreground)); max-width: 380px; }
+
+    .graph-frame {
+      height: 430px;
+      overflow: auto;
+      position: relative;
+      max-width: 100%;
+      background-image: radial-gradient(hsl(var(--border)) 1px, transparent 1px);
+      background-size: 18px 18px;
+    }
+    .graph-node {
+      position: absolute;
+      width: 190px;
+      border: 1px solid hsl(var(--border));
+      border-radius: 8px;
+      background: hsl(var(--card));
+      padding: 9px 10px 9px 14px;
+      box-shadow: 0 1px 2px hsl(0 0% 0% / .06);
+    }
+    .graph-node.target { border-color: hsl(var(--foreground) / .28); box-shadow: 0 0 0 3px hsl(var(--foreground) / .08); }
+    .graph-stripe { position: absolute; inset: 0 auto 0 0; width: 4px; border-radius: 8px 0 0 8px; background: hsl(var(--muted-foreground)); }
+    .graph-node h4 { margin: 5px 0 3px; font-size: 12px; line-height: 1.22; }
+    .graph-node p { margin: 0; color: hsl(var(--muted-foreground)); font-size: 10px; }
+
+    .decision-card {
+      border-style: dashed;
+      background: linear-gradient(180deg, hsl(var(--card)), hsl(var(--muted) / .35));
+    }
+    .decision-layout { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; }
+    .decision-layout > * { min-width: 0; }
+    .reveal-note { margin: 0; color: hsl(var(--muted-foreground)); font-size: 13px; line-height: 1.55; }
+
+    /* Dialog component */
+    .dialog-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 90;
+      background: hsl(0 0% 0% / .80);
+      animation: fadeIn .16s ease both;
+    }
+    .dialog-content {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      z-index: 100;
+      display: grid;
+      width: min(calc(100% - 28px), 620px);
+      max-height: calc(100vh - 48px);
+      overflow: auto;
+      transform: translate(-50%, -50%);
+      gap: 16px;
+      border: 1px solid hsl(var(--border));
+      background: hsl(var(--background));
+      padding: 24px;
+      box-shadow: 0 24px 72px hsl(0 0% 0% / .32);
+      border-radius: 10px;
+      animation: zoomIn .18s ease both;
+    }
+    .dialog-close {
+      position: absolute;
+      right: 16px;
+      top: 16px;
+      width: 28px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 0;
+      border-radius: 4px;
+      background: transparent;
+      color: hsl(var(--muted-foreground));
+      opacity: .7;
+    }
+    .dialog-close:hover { opacity: 1; background: hsl(var(--accent)); }
+    .dialog-title { margin: 0; font-size: 18px; line-height: 1; font-weight: 700; }
+    .dialog-description { margin: 4px 0 0; color: hsl(var(--muted-foreground)); font-size: 14px; line-height: 1.55; }
+    .verdict-status { display: flex; align-items: center; gap: 14px; padding: 16px; border: 1px solid hsl(var(--border)); border-radius: 10px; }
+    .verdict-icon { width: 48px; height: 48px; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; flex: 0 0 48px; }
+    .risk-meter { height: 8px; border-radius: 999px; overflow: hidden; background: hsl(var(--muted)); }
+    .risk-meter span { display: block; height: 100%; border-radius: inherit; }
+    .finding-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+    .finding-list li { border: 1px solid hsl(var(--border)); border-radius: 8px; padding: 10px; }
+    .finding-list strong { display: block; font-size: 12px; margin-bottom: 3px; }
+    .finding-list p { margin: 0; color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.45; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes zoomIn { from { opacity: 0; transform: translate(-50%, -50%) scale(.96); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+
+    @media (max-width: 960px) {
+      .review-grid { grid-template-columns: 1fr; }
+      .stats-grid { height: 240px; }
+      .review-steps { grid-template-columns: repeat(2, 1fr); }
+      .nav-links { display: none; }
+    }
+    @media (max-width: 680px) {
+      .page { padding-top: 12px; }
+      .shell { width: min(100% - 20px, 1180px); }
+      .floating-header { top: 10px; width: min(100% - 20px, 768px); margin-bottom: 18px; }
+      .case-switcher { display: none; }
+      .search-row { flex-direction: column; }
+      .card-header { padding: 20px; }
+      .card-content { padding: 0 20px 20px; }
+      .section-head { align-items: flex-start; }
+      .feature-grid, .stats-grid, .review-steps { grid-template-columns: 1fr; }
+      .stats-grid { height: auto; }
+      .bar-chart { height: 180px; }
+      .case-title-row, .decision-layout { grid-template-columns: 1fr; display: grid; }
+      .decision-card .btn { width: 100%; }
+      .table-tools { width: 100%; justify-content: space-between; }
+      .table-tools input { flex: 1; min-width: 160px; }
+      .tree-meta { display: none; }
+      .graph-frame { height: 360px; }
+      .dialog-content { padding: 20px; }
+      .treatment-grid-wrap { padding: 0 20px 20px; }
+      .treatment-grid-header { display: none; }
+      .treatment-grid-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px 12px;
+        min-height: 56px;
+      }
+      .treatment-grid-row .treatment-grid-cell:nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+      .treatment-grid-count { align-self: center; }
+      .inline-analytics-shell { padding: 16px; }
+      table { min-width: 0; }
+      thead { display: none; }
+      tbody tr {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 6px 12px;
+        padding: 14px;
+        border-bottom: 1px solid hsl(var(--border));
+      }
+      tbody td { border-bottom: 0; padding: 0; }
+      tbody td:nth-child(1) { grid-column: 1; grid-row: 1; }
+      tbody td:nth-child(2) { grid-column: 2; grid-row: 1; align-self: start; }
+      tbody td:nth-child(3), tbody td:nth-child(4) { display: none; }
+      tbody td:nth-child(5) { grid-column: 1 / -1; }
+      .inline-analytics-table { min-width: 600px; }
+      .inline-analytics-table thead { display: table-header-group; }
+      .inline-analytics-table tbody tr { display: table-row; padding: 0; border-bottom: 0; }
+      .inline-analytics-table tbody td {
+        display: table-cell;
+        border-bottom: 1px solid hsl(var(--border));
+        padding: 13px 14px;
+      }
+      .inline-analytics-table tbody td:nth-child(1),
+      .inline-analytics-table tbody td:nth-child(2),
+      .inline-analytics-table tbody td:nth-child(3),
+      .inline-analytics-table tbody td:nth-child(4),
+      .inline-analytics-table tbody td:nth-child(5) {
+        display: table-cell;
+        grid-column: auto;
+        grid-row: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script>
+    const TREAT = {
+      followed: { label: "Followed", weight: 70 },
+      "cited-neutral": { label: "Cited", weight: 15 },
+      discussed: { label: "Discussed", weight: 10 },
+      clarified: { label: "Clarified", weight: 35 },
+      distinguished: { label: "Distinguished", weight: -25 },
+      questioned: { label: "Questioned", weight: -45 },
+      limited: { label: "Limited", weight: -40 },
+      criticised: { label: "Criticised", weight: -60 },
+      superseded: { label: "Superseded", weight: -75 },
+      overruled: { label: "Overruled", weight: -100 },
+      abrogated: { label: "Abrogated", weight: -95 },
+      reversed: { label: "Reversed", weight: -50 }
+    };
+
+    const SIG = {
+      green: { label: "Good Law", icon: "shield-check", color: "hsl(var(--good))", bg: "hsl(var(--good-bg))", guidance: "No dispositive negative treatment detected. Cite with ordinary care and confirm the precise proposition in your pin cite." },
+      amber: { label: "Eroding", icon: "triangle-alert", color: "hsl(var(--warning))", bg: "hsl(var(--warning-bg))", guidance: "Still citable, but later courts have limited or questioned it. Confirm jurisdiction, posture, and the exact holding before relying on the broad rule." },
+      red: { label: "High Risk", icon: "octagon-alert", color: "hsl(var(--danger))", bg: "hsl(var(--danger-bg))", guidance: "Materially undermined or overruled. Do not cite for the broad proposition. Identify the controlling authority and cite that instead." }
+    };
+
+    const API = (location.search.match(/[?&]api=([^&]+)/)||[])[1] || "http://localhost:8080";
+
+    // id -> display name (chips + search). Case DATA is fetched LIVE from our API.
+    const CASES = {
+      "6480696": "NYSRPA v. Bruen", "108713": "Roe v. Wade",
+      "94508": "Plessy v. Ferguson", "111738": "Bowers v. Hardwick",
+      "96276": "Lochner v. New York", "118089": "Auer v. Robbins",
+      "112404": "Emp. Div. v. Smith",
+    };
+
+    const DATA = {};  // populated live by loadCase()
+
+    async function jget(p) { const r = await fetch(API + p); if (!r.ok) throw new Error(p + " " + r.status); return r.json(); }
+    const yr = (d) => Number(String(d || "").slice(0, 4)) || "";
+
+    // Assemble Stef's case object from /cases/{id}/risk + /graph (real citator data).
+    async function loadCase(id) {
+      if (DATA[id]) return DATA[id];
+      const [risk, graph] = await Promise.all([jget(`/cases/${id}/risk`), jget(`/cases/${id}/graph`)]);
+      const meta = Object.fromEntries(graph.nodes.map((n) => [String(n.case_id), n]));
+      const pol = { positive: 0, negative: 0, neutral: 0 };
+      const bd = {};
+      graph.edges.forEach((e) => { pol[e.polarity] = (pol[e.polarity] || 0) + 1;
+        const t = e.treatment || "cited-neutral"; bd[t] = (bd[t] || 0) + 1; });
+      const breakdown = Object.entries(bd).map(([treatment, count]) => ({ treatment, count }));
+      const authorities = graph.edges.filter((e) => e.polarity !== "neutral").map((e) => {
+        const m = meta[String(e.citing_id)] || {};
+        return { caseName: m.case_name || ("Case " + e.citing_id), citation: m.citation || "",
+          court: m.court || "", year: yr(m.date_filed), treatment: e.treatment || "cited-neutral",
+          treatmentWeight: (TREAT[e.treatment] && TREAT[e.treatment].weight) || 0, summary: e.quote || "" };
+      }).sort((a, b) => a.treatmentWeight - b.treatmentWeight);
+      // Graph: keep focal + treated edges only, so the layered layout stays readable.
+      const treated = graph.edges.filter((e) => e.polarity !== "neutral");
+      const focalId = String(graph.focal.case_id);
+      const keep = new Set([focalId, ...treated.flatMap((e) => [String(e.citing_id), String(e.cited_id)])]);
+      const c = {
+        short: CASES[id] || (risk.case.case_name || "Case").split(" ")[0],
+        signal: risk.signal === "unknown" ? "amber" : risk.signal,
+        caseName: risk.case.case_name, citation: risk.case.citation || "",
+        court: risk.case.court || "", year: yr(risk.case.date_filed), subjects: [],
+        riskScore: risk.risk_score, riskRationale: risk.risk_rationale,
+        overruledBy: (risk.ground_truth && risk.ground_truth.overruled_by) || "",
+        totalCitations: risk.positive_signal.total_citing,
+        positive: pol.positive, negative: pol.negative, neutral: pol.neutral,
+        mostRecent: "", posSignal: risk.positive_signal.approving_cites, totalCiting: risk.positive_signal.total_citing,
+        trend: (risk.trend || []).map((t) => ({ year: t.year, negShare: t.neg_share })),
+        negTreatments: (risk.negative_treatments || []).map((n) => ({ type: n.type,
+          caseName: (n.citing_case && n.citing_case.case_name) || "Citing case",
+          conf: n.confidence == null ? 0.8 : n.confidence, quote: n.quote || "" })),
+        breakdown, risks: [], authorities,
+        graph: {
+          nodes: graph.nodes.filter((n) => keep.has(String(n.case_id))).map((n) => ({
+            id: String(n.case_id), type: n.is_focal ? "target" : "case",
+            label: n.case_name || ("Case " + n.case_id), citation: n.citation || "",
+            year: yr(n.date_filed), jurisdiction: n.court || "", isTarget: !!n.is_focal,
+            treatment: (treated.find((e) => String(e.citing_id) === String(n.case_id)) || {}).treatment })),
+          edges: treated.map((e) => ({ source: String(e.citing_id), target: String(e.cited_id),
+            treatment: e.treatment || "cited-neutral", weight: (TREAT[e.treatment] && TREAT[e.treatment].weight) || 0 })),
+        },
+      };
+      DATA[id] = c; return c;
+    }
+
+    const state = {
+      screen: "search",
+      caseId: "",
+      loading: false,
+      dark: false,
+      query: "",
+      filter: "",
+      sort: "treatmentWeight",
+      desc: true,
+      verdictOpen: false,
+      expanded: { root: true, incoming: true, cited: true, subjects: true }
+    };
+
+    const items = [
+      { id: "1", region: "North America", sales: 1200, revenue: 25000, growth: 12 },
+      { id: "2", region: "Europe", sales: 900, revenue: 18000, growth: -5 },
+      { id: "3", region: "Asia", sales: 1500, revenue: 30000, growth: 20 },
+      { id: "4", region: "South America", sales: 600, revenue: 10000, growth: 8 },
+      { id: "5", region: "Africa", sales: 400, revenue: 7000, growth: -3 }
+    ];
+
+    const app = document.getElementById("app");
+    const fmt = n => Number(n).toLocaleString();
+    const pct = (n, d) => Math.round((n / Math.max(d, 1)) * 100);
+    const esc = value => String(value ?? "").replace(/[&<>"']/g, m => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#039;" }[m]));
+    const current = () => DATA[state.caseId];
+    const sig = c => SIG[c.signal];
+    const treatmentColor = t => {
+      const w = TREAT[t]?.weight ?? 0;
+      if (t === "followed") return "hsl(var(--analytics-mint))";
+      if (t === "clarified") return "hsl(var(--analytics-violet))";
+      if (t === "distinguished" || t === "limited" || t === "questioned") return "hsl(var(--analytics-gold))";
+      if (w < 0) return "hsl(var(--analytics-rose))";
+      return "hsl(var(--analytics-slate))";
+    };
+
+    function render() {
+      document.documentElement.classList.toggle("dark", state.dark);
+      app.innerHTML = `
+        <div class="page">
+          ${dotGrid()}
+          ${header()}
+          ${state.screen === "search" ? searchPage() : dashboardPage()}
+          ${state.verdictOpen ? verdictDialog(current()) : ""}
+        </div>
+      `;
+      if (window.lucide) window.lucide.createIcons();
+    }
+
+    function dotGrid() {
+      return `<div class="dot-grid" aria-hidden="true"></div>`;
+    }
+
+    function header() {
+      const cases = Object.entries(CASES).map(([id, c]) =>
+        `<button class="case-pill ${id === state.caseId ? "active" : ""}" data-open="${id}">${esc(c)}</button>`
+      ).join("");
+      return `
+        <header class="floating-header">
+          <nav>
+            <button class="brand" data-action="home" aria-label="CiteMeRight home">
+              <span class="brand-mark"><i data-lucide="grid-2x2-plus" width="20" height="20"></i></span>
+              <span class="brand-name">CMR</span>
+            </button>
+            <div class="nav-links">
+              <a class="btn" href="#evidence">Evidence</a>
+              <a class="btn" href="#authorities">Authorities</a>
+              <a class="btn" href="#decision">Final step</a>
+            </div>
+            <div class="nav-actions">
+              ${state.screen === "result" ? `<div class="case-switcher">${cases}</div>` : ""}
+              <button class="btn btn-icon btn-outline" data-action="theme" aria-label="Toggle theme">
+                <i data-lucide="${state.dark ? "sun" : "moon"}" width="16" height="16"></i>
+              </button>
+            </div>
+          </nav>
+        </header>`;
+    }
+
+    function searchPage() {
+      const demos = Object.entries(CASES).map(([id, c]) => `<button class="demo-chip" data-open="${id}"><span class="dot"></span>${esc(c)}</button>`).join("");
+      return `
+        <main class="hero shell">
+          <section class="card search-card">
+            <div class="card-header">
+              <span class="eyebrow"><i data-lucide="scale" width="14" height="14"></i> Citation health dashboard</span>
+              <h1>Review the record before the result.</h1>
+              <p class="card-description">Search a case, inspect the treatment history, trace the authorities, then reveal the verdict only after the evidence is assembled.</p>
+              <form class="search-row" data-action="search">
+                <div class="input-wrap">
+                  <i data-lucide="search" width="16" height="16"></i>
+                  <input id="searchInput" value="${esc(state.query)}" placeholder="e.g. Roe v. Wade or 410 U.S. 113" autocomplete="off" />
+                </div>
+                <button class="btn btn-primary btn-large" type="submit">Check</button>
+              </form>
+              <div class="demo-row">${demos}</div>
+            </div>
+            <div class="card-content">
+              <div class="feature-grid">
+                ${miniCard("git-fork", "Mapped authorities", "See citing and cited cases as one review path.")}
+                ${miniCard("list-filter", "Treatment evidence", "Sort, filter, and compare every authority before the verdict.")}
+                ${miniCard("lock-keyhole", "Delayed reveal", "The legal-status answer is intentionally held until the end.")}
+              </div>
+            </div>
+          </section>
+        </main>`;
+    }
+
+    function miniCard(icon, title, desc) {
+      return `<div class="card mini-card"><span class="icon-box"><i data-lucide="${icon}" width="15" height="15"></i></span><h3>${title}</h3><p>${desc}</p></div>`;
+    }
+
+    function dashboardPage() {
+      const c = current();
+      if (!c) return `<main class="shell"><p class="muted" style="padding:48px 4px">Loading case…</p></main>`;
+      return `
+        <main class="shell">
+          <section class="case-hero">
+            <div class="card case-card">
+              <div class="card-header">
+                <div class="case-title-row">
+                  <div>
+                    <span class="eyebrow"><i data-lucide="file-search" width="14" height="14"></i> Case review started</span>
+                    <h1 class="case-title">${esc(c.caseName)}</h1>
+                  </div>
+                  <button class="btn btn-outline" data-action="home"><i data-lucide="arrow-left" width="14" height="14"></i> New search</button>
+                </div>
+                <div class="metadata">
+                  <span class="mono">${esc(c.citation)}</span>
+                  <span>${esc(c.court)}</span>
+                  <span class="mono">${esc(c.year)}</span>
+                  <span>${esc(c.subjects.join(" / "))}</span>
+                </div>
+              </div>
+              <div class="review-steps">
+                ${step(1, "Evidence mix")}
+                ${step(2, "Authority tree")}
+                ${step(3, "Citation graph")}
+                ${step(4, "Final step")}
+              </div>
+            </div>
+          </section>
+
+          <div class="review-grid">
+            <div class="stack">
+              ${evidenceCard(c)}
+              ${InlineAnalyticsTable()}
+              ${tableCard(c)}
+              ${graphCard(c)}
+            </div>
+            <aside class="stack">
+              ${authorityTreeCard(c)}
+              ${riskFactorsCard(c)}
+            </aside>
+          </div>
+          <div style="margin-top:16px">${decisionCard(c)}</div>
+        </main>`;
+    }
+
+    function step(n, label) {
+      return `<div class="step"><span class="step-number">${n}</span><span>${esc(label)}</span></div>`;
+    }
+
+    function evidenceCard(c) {
+      const total = c.positive + c.neutral + c.negative;
+      const bars = [
+        { label: "Approving", value: pct(c.positive, total), tone: "approving" },
+        { label: "Neutral", value: pct(c.neutral, total), tone: "neutral" },
+        { label: "Negative", value: pct(c.negative, total), tone: "negative" },
+        { label: "Depth", value: Math.min(99, Math.max(18, Math.round(c.totalCitations / 55))), tone: "depth" }
+      ];
+      return `
+        <section id="evidence" class="card">
+          <div class="section-head">
+            <div>
+              <h2>Evidence mix</h2>
+              <p>Neutral count data first. The verdict is withheld until the review is complete.</p>
+            </div>
+            <span class="count-badge">${fmt(c.totalCitations)} citing records</span>
+          </div>
+          <div class="stats-wrap">
+            <div class="stats-grid">
+              ${bars.map((b, i) => `
+                <div class="bar-chart" data-tone="${esc(b.tone)}" style="animation-delay:${i * 80}ms">
+                  <div class="bar-shell candy-bg"><div class="bar-fill" style="height:${Math.max(b.value, 18)}%"><div class="bar-value">${b.value}%</div></div></div>
+                  <p class="bar-label">${esc(b.label)}</p>
+                </div>`).join("")}
+            </div>
+          </div>
+        </section>`;
+    }
+
+    function GrowthIcon(growth) {
+      return `<span class="trend-icon ${growth >= 0 ? "positive" : "negative"}"><i data-lucide="${growth >= 0 ? "trending-up" : "trending-down"}" width="16" height="16"></i></span>`;
+    }
+
+    function InlineAnalyticsTable() {
+      const totalRevenue = items.reduce((acc, cur) => acc + cur.revenue, 0);
+      return `
+        <section class="card">
+          <div class="inline-analytics-shell">
+            <table class="inline-analytics-table">
+              <thead>
+                <tr>
+                  <th style="width:25%">Region</th>
+                  <th style="width:20%">
+                    <div class="analytics-head">
+                      <span>Sales</span>
+                      <span class="header-progress"><span style="width:70%"></span></span>
+                    </div>
+                  </th>
+                  <th style="width:20%">
+                    <div class="analytics-head">
+                      <span>Revenue</span>
+                      <span class="header-progress"><span style="width:60%"></span></span>
+                    </div>
+                  </th>
+                  <th style="width:20%">
+                    <div class="analytics-head">
+                      <span>Growth</span>
+                      <span class="header-progress"><span style="width:50%"></span></span>
+                    </div>
+                  </th>
+                  <th style="width:15%">Trend</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${items.map(item => `
+                  <tr>
+                    <td class="font-medium">${esc(item.region)}</td>
+                    <td>${item.sales}</td>
+                    <td>$${item.revenue.toLocaleString()}</td>
+                    <td>${item.growth}%</td>
+                    <td class="trend-cell">${GrowthIcon(item.growth)}</td>
+                  </tr>`).join("")}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="2">Total</td>
+                  <td>$${totalRevenue.toLocaleString()}</td>
+                  <td colspan="2"></td>
+                </tr>
+              </tfoot>
+            </table>
+            <p class="inline-analytics-caption">Wide Inline Analytics Table with balanced spacing</p>
+          </div>
+        </section>`;
+    }
+
+    function authorityTreeCard(c) {
+      const incoming = c.authorities.map((a, index) => ({ id: "auth-" + index, label: a.caseName, meta: `${a.year} · ${TREAT[a.treatment].label}`, icon: a.treatmentWeight < 0 ? "file-warning" : "file-check" }));
+      const subjects = c.subjects.map((s, index) => ({ id: "subject-" + index, label: s, meta: "subject", icon: "tag" }));
+      const data = [
+        { id: "root", label: c.caseName, meta: c.citation, icon: "scale", children: [
+          { id: "incoming", label: "Citing authorities", meta: `${incoming.length} cases`, icon: "folder", children: incoming },
+          { id: "subjects", label: "Research subjects", meta: `${subjects.length} tags`, icon: "folder", children: subjects }
+        ]}
+      ];
+      return `
+        <section id="authorities" class="card">
+          <div class="section-head">
+            <div><h2>Authority tree</h2><p>Collapsed into one navigable evidence path.</p></div>
+          </div>
+          <div class="card-content">${treeView(data)}</div>
+        </section>`;
+    }
+
+    function treeView(nodes, level = 0, parentPath = []) {
+      if (level === 0) return `<div class="tree-view">${nodes.map((n, i) => treeNode(n, level, i === nodes.length - 1, parentPath)).join("")}</div>`;
+      return nodes.map((n, i) => treeNode(n, level, i === nodes.length - 1, parentPath)).join("");
+    }
+
+    function treeNode(node, level, isLast, parentPath) {
+      const hasChildren = node.children && node.children.length;
+      const open = !!state.expanded[node.id];
+      const pad = level * 20 + 8;
+      const lines = parentPath.map((last, i) => last ? "" : `<span class="tree-line" style="left:${i * 20 + 12}px"></span>`).join("");
+      const elbow = level > 0 ? `<span class="tree-elbow" style="left:${(level - 1) * 20 + 12}px;width:16px"></span>` : "";
+      return `
+        <div class="tree-node">
+          <div class="tree-row ${open ? "open" : ""} ${level === 0 ? "selected" : ""}" data-tree="${esc(node.id)}" style="padding-left:${pad}px">
+            ${lines}${elbow}
+            <span class="tree-chevron">${hasChildren ? `<i data-lucide="chevron-right" width="13" height="13"></i>` : ""}</span>
+            <span class="tree-icon"><i data-lucide="${node.icon || (hasChildren ? "folder" : "file")}" width="14" height="14"></i></span>
+            <span class="tree-label">${esc(node.label)}</span>
+            <span class="tree-meta">${esc(node.meta || "")}</span>
+          </div>
+          ${hasChildren && open ? `<div>${treeView(node.children, level + 1, [...parentPath, isLast])}</div>` : ""}
+        </div>`;
+    }
+
+    function riskFactorsCard(c) {
+      return `
+        <section class="card">
+          <div class="section-head">
+            <div><h2>Review notes</h2><p>These are evidence prompts, not the final verdict.</p></div>
+          </div>
+          <div class="card-content">
+            <ul class="finding-list">
+              ${c.risks.map(r => `<li><strong>${esc(r.label)}</strong><p>${esc(r.detail)}</p></li>`).join("")}
+            </ul>
+          </div>
+        </section>`;
+    }
+
+    function tableCard(c) {
+      const q = state.filter.trim().toLowerCase();
+      let rows = c.authorities.filter(a => !q || `${a.caseName} ${a.citation} ${a.court} ${a.summary}`.toLowerCase().includes(q));
+      rows = rows.sort((a, b) => {
+        const av = a[state.sort], bv = b[state.sort];
+        if (av < bv) return state.desc ? 1 : -1;
+        if (av > bv) return state.desc ? -1 : 1;
+        return 0;
+      });
+      return `
+        <section class="card">
+          <div class="section-head">
+            <div><h2>Citing authorities</h2><p>Sort and filter the record before opening the verdict.</p></div>
+            <div class="table-tools">
+              <span class="count-badge">${rows.length} of ${c.authorities.length}</span>
+              <input id="filterInput" value="${esc(state.filter)}" placeholder="Filter cases..." style="width:190px;height:34px" />
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                ${th("caseName", "Case")}
+                ${th("treatmentWeight", "Treatment")}
+                ${th("court", "Court")}
+                ${th("year", "Year")}
+                <th>Summary</th>
+              </tr></thead>
+              <tbody>
+                ${rows.map(a => `
+                  <tr>
+                    <td><strong>${esc(a.caseName)}</strong><div class="mono muted" style="font-size:11px;margin-top:3px">${esc(a.citation)}</div></td>
+                    <td><span class="tag" style="color:${treatmentColor(a.treatment)}">${esc(TREAT[a.treatment].label)}</span></td>
+                    <td class="muted">${esc(a.court)}</td>
+                    <td class="mono muted">${esc(a.year)}</td>
+                    <td class="summary-cell">${esc(a.summary)}</td>
+                  </tr>`).join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>`;
+    }
+
+    function th(key, label) {
+      return `<th><button class="btn" style="height:auto;padding:0;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:hsl(var(--muted-foreground))" data-sort="${key}">${label}${state.sort === key ? ` <i data-lucide="${state.desc ? "arrow-down" : "arrow-up"}" width="11" height="11"></i>` : ""}</button></th>`;
+    }
+
+    function graphCard(c) {
+      const g = buildGraph(c);
+      return `
+        <section class="card">
+          <div class="section-head">
+            <div><h2>Citation graph</h2><p>Target case centered between inbound and cited authorities.</p></div>
+            <span class="count-badge">${c.graph.nodes.length} nodes · ${c.graph.edges.length} edges</span>
+          </div>
+          <div class="graph-frame">
+            <div style="position:relative;width:${g.width}px;height:${g.height}px;min-width:100%">
+              <svg style="position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none">
+                ${g.edges.map(e => `<path d="${e.d}" fill="none" stroke="${e.color}" stroke-width="${e.width}" opacity=".85"></path>`).join("")}
+              </svg>
+              ${g.nodes.map(n => `
+                <div class="graph-node ${n.target ? "target" : ""}" style="left:${n.x}px;top:${n.y}px">
+                  <span class="graph-stripe" style="background:${n.color}"></span>
+                  <div style="display:flex;align-items:center;gap:6px;color:${n.color}"><i data-lucide="${n.icon}" width="12" height="12"></i><span class="mono muted" style="font-size:10px">${esc(n.jurisdiction)}</span></div>
+                  <h4>${esc(n.label)}</h4>
+                  <p class="mono">${esc(n.citation)} · ${esc(n.year)}</p>
+                </div>`).join("")}
+            </div>
+          </div>
+        </section>`;
+    }
+
+    function buildGraph(c) {
+      const nodes = c.graph.nodes, edges = c.graph.edges, target = nodes.find(n => n.isTarget);
+      const NW = 190, NH = 72, gap = 104, col = 260, pad = 34;
+      const citing = new Set(edges.filter(e => e.target === target.id).map(e => e.source));
+      const cited = new Set(edges.filter(e => e.source === target.id).map(e => e.target));
+      const inbound = nodes.filter(n => citing.has(n.id));
+      const outbound = nodes.filter(n => cited.has(n.id));
+      const pos = { [target.id]: { x: col, y: Math.max(inbound.length, outbound.length) * gap / 2 } };
+      inbound.forEach((n, i) => pos[n.id] = { x: col * 2, y: i * gap + 10 });
+      outbound.forEach((n, i) => pos[n.id] = { x: 0, y: i * gap + 10 });
+      const width = col * 2 + NW + pad * 2;
+      const height = Math.max(360, Math.max(inbound.length, outbound.length, 1) * gap + NH + pad);
+      const visualNodes = nodes.map(n => ({
+        x: pos[n.id].x + pad, y: pos[n.id].y + pad, target: !!n.isTarget,
+        label: n.label, citation: n.citation, year: n.year, jurisdiction: n.jurisdiction,
+        icon: n.type === "statute" ? "book-marked" : "scale",
+        color: n.isTarget ? "hsl(var(--foreground))" : treatmentColor(n.treatment)
+      }));
+      const geo = {};
+      visualNodes.forEach((n, i) => geo[nodes[i].id] = { left: n.x, right: n.x + NW, cy: n.y + NH / 2 });
+      const visualEdges = edges.map(e => {
+        const s = geo[e.source], t = geo[e.target];
+        const forward = t.left >= s.left;
+        const x1 = forward ? s.right : s.left, x2 = forward ? t.left : t.right;
+        const mx = (x1 + x2) / 2;
+        return { d: `M ${x1} ${s.cy} C ${mx} ${s.cy}, ${mx} ${t.cy}, ${x2} ${t.cy}`, color: treatmentColor(e.treatment), width: Math.abs(e.weight) >= 60 ? 2 : 1.25 };
+      });
+      return { width, height, nodes: visualNodes, edges: visualEdges };
+    }
+
+    function decisionCard(c) {
+      return `
+        <section id="decision" class="card decision-card">
+          <div class="card-header decision-layout">
+            <div>
+              <span class="eyebrow"><i data-lucide="lock-keyhole" width="14" height="14"></i> Final step</span>
+              <h2 class="card-title" style="margin-top:12px">Reveal the verdict after reviewing the record.</h2>
+              <p class="reveal-note">The dashboard holds back the answer so the user first sees the evidence pattern, authority tree, table, and graph.</p>
+            </div>
+            <button class="btn btn-primary btn-large" data-action="reveal"><i data-lucide="gavel" width="16" height="16"></i> Reveal verdict</button>
+          </div>
+        </section>`;
+    }
+
+    function verdictDialog(c) {
+      const s = sig(c);
+      const risk = Math.round(c.riskScore * 100);
+      const neg = c.negTreatments.length ? c.negTreatments.map(n => `<li><strong>${esc(TREAT[n.type].label)} · ${esc(n.caseName)} (${Math.round(n.conf * 100)}% confidence)</strong><p>${esc(n.quote)}</p></li>`).join("") : `<li><strong>No significant negative treatments</strong><p>No dispositive negative treatment was found in this demo record.</p></li>`;
+      return `
+        <div class="dialog-overlay" data-action="close"></div>
+        <section class="dialog-content" role="dialog" aria-modal="true" aria-labelledby="verdict-title">
+          <button class="dialog-close" data-action="close" aria-label="Close"><i data-lucide="x" width="16" height="16"></i></button>
+          <div>
+            <h2 id="verdict-title" class="dialog-title">Verdict</h2>
+            <p class="dialog-description">${esc(c.caseName)} · ${esc(c.citation)}</p>
+          </div>
+          <div class="verdict-status" style="border-color:${s.color}; background:${s.bg}">
+            <span class="verdict-icon" style="background:hsl(var(--background) / .72); color:${s.color}"><i data-lucide="${s.icon}" width="24" height="24"></i></span>
+            <div style="min-width:0;flex:1">
+              <div style="font-size:12px;font-weight:700;text-transform:uppercase;color:${s.color};letter-spacing:.08em">${esc(s.label)}</div>
+              <div style="margin-top:5px;font-size:24px;font-weight:760;line-height:1">${risk}% risk score</div>
+            </div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:8px;font-size:12px;color:hsl(var(--muted-foreground))"><span>Risk meter</span><span class="mono">${c.riskScore.toFixed(2)}</span></div>
+            <div class="risk-meter"><span style="width:${risk}%; background:${s.color}"></span></div>
+          </div>
+          <p class="dialog-description" style="color:hsl(var(--foreground));">${esc(c.riskRationale)}</p>
+          ${c.overruledBy ? `<div class="card" style="padding:12px;border-color:${s.color}"><strong style="font-size:12px;color:${s.color}">Overruled by</strong><p class="dialog-description">${esc(c.overruledBy)}</p></div>` : ""}
+          <div>
+            <h3 style="margin:0 0 8px;font-size:13px">Negative treatment record</h3>
+            <ul class="finding-list">${neg}</ul>
+          </div>
+          <div class="card-footer" style="padding:0;justify-content:flex-end">
+            <button class="btn btn-outline" data-action="close">Back to evidence</button>
+            <button class="btn btn-primary" data-action="close">${esc(s.guidance.includes("Do not") ? "Understood" : "Continue")}</button>
+          </div>
+        </section>`;
+    }
+
+    document.addEventListener("click", async event => {
+      const open = event.target.closest("[data-open]");
+      if (open) {
+        const id = open.dataset.open;
+        state.caseId = id; state.screen = "result"; state.filter = ""; state.verdictOpen = false;
+        render();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        if (!DATA[id]) { try { await loadCase(id); } catch (e) { console.error(e); } render(); }
+        return;
+      }
+      const sort = event.target.closest("[data-sort]");
+      if (sort) {
+        const key = sort.dataset.sort;
+        if (state.sort === key) state.desc = !state.desc;
+        else { state.sort = key; state.desc = false; }
+        render();
+        return;
+      }
+      const tree = event.target.closest("[data-tree]");
+      if (tree) {
+        state.expanded[tree.dataset.tree] = !state.expanded[tree.dataset.tree];
+        render();
+        return;
+      }
+      const action = event.target.closest("[data-action]")?.dataset.action;
+      if (!action) return;
+      if (action === "home") { state.screen = "search"; state.verdictOpen = false; render(); }
+      if (action === "theme") { state.dark = !state.dark; render(); }
+      if (action === "reveal") { state.verdictOpen = true; render(); }
+      if (action === "close") { state.verdictOpen = false; render(); }
+    });
+
+    document.addEventListener("submit", async event => {
+      if (!event.target.matches("[data-action='search']")) return;
+      event.preventDefault();
+      const q = document.getElementById("searchInput").value.trim().toLowerCase();
+      state.query = q;
+      const id = Object.keys(CASES).find(k => CASES[k].toLowerCase().includes(q) || k === q) || "6480696";
+      state.caseId = id; state.screen = "result"; render();
+      if (!DATA[id]) { try { await loadCase(id); } catch (e) { console.error(e); } render(); }
+    });
+
+    document.addEventListener("input", event => {
+      if (event.target.id === "searchInput") state.query = event.target.value;
+      if (event.target.id === "filterInput") { state.filter = event.target.value; render(); }
+    });
+
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape" && state.verdictOpen) { state.verdictOpen = false; render(); }
+    });
+
+    let dotFrame = 0;
+    document.addEventListener("pointermove", event => {
+      if (event.pointerType === "touch") return;
+      if (dotFrame) cancelAnimationFrame(dotFrame);
+      dotFrame = requestAnimationFrame(() => {
+        document.documentElement.style.setProperty("--dot-x", `${event.clientX}px`);
+        document.documentElement.style.setProperty("--dot-y", `${event.clientY}px`);
+        document.documentElement.classList.add("dot-hover");
+        dotFrame = 0;
+      });
+    }, { passive: true });
+
+    document.addEventListener("pointerleave", () => {
+      document.documentElement.classList.remove("dot-hover");
+    });
+
+    render();
+  </script>
+</body>
+</html>
