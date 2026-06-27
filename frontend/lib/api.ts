@@ -260,6 +260,10 @@ export type PropositionsResult = {
   as_of: string;
 };
 
+export async function casePropositions(id: number): Promise<PropositionsResult> {
+  return request(`/cases/${id}/propositions`);
+}
+
 // --- Feature 5 (C): POST /cases/{id}/verdict -------------------------------- #
 export type UseMapping = {
   use_label: string;

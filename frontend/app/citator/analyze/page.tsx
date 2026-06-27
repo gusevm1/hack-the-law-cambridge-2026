@@ -2,21 +2,24 @@
 
 // Citator analysis stepper — Feature 1 (Filter). Fetches GET /cases/{id}/triage
 // (public, no auth — see app/src/htl/routes/triage.py), which carries the
-// resolved case + every inbound edge tiered deep|shallow|mention. Resolve and
-// Citations are live; Treatment / Relation / Verdict are placeholders for later
-// features. Defaults to Bruen (6480696). The case shown comes from the triage
+// resolved case + every inbound edge tiered deep|shallow|mention. Resolve,
+// Citations, Treatment and Relation are live; Verdict is a placeholder for the
+// next feature. Defaults to Bruen (6480696). The case shown comes from the triage
 // response itself, so this never depends on the live /resolve or the DB.
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   caseTriage,
   caseClassify,
+  casePropositions,
   type TriageResult,
   type TieredEdge,
   type ClassifyResult,
   type ClassifiedEdge,
+  type PropositionsResult,
 } from "@/lib/api";
 import VerdictStep from "./steps/verdict";
+import { RelationStep } from "./steps/relation";
 
 const BRUEN_ID = 6480696;
 const API_DOWN = "Couldn't reach the citator API — is `just dev-api` running?";
@@ -69,11 +72,15 @@ export default function Analyze() {
   const [classify, setClassify] = useState<ClassifyResult | null>(null);
   const [classifyLoading, setClassifyLoading] = useState(false);
   const [classifyError, setClassifyError] = useState<string | null>(null);
+  const [props, setProps] = useState<PropositionsResult | null>(null);
+  const [propsLoading, setPropsLoading] = useState(false);
+  const [propsError, setPropsError] = useState<string | null>(null);
 
   async function load(id: number) {
     setLoading(true);
     setError(null);
     setClassify(null); // stale classification belongs to the previous case
+    setProps(null); // ditto for the proposition aggregation
     try {
       setData(await caseTriage(id));
     } catch {
@@ -104,6 +111,22 @@ export default function Analyze() {
       cancelled = true;
     };
   }, [step, data, classify]);
+
+  // Same lazy pattern for the Relation step — aggregate propositions on demand.
+  useEffect(() => {
+    if (step !== 3 || !data) return;
+    if (props && props.case.case_id === data.case.case_id) return;
+    let cancelled = false;
+    setPropsLoading(true);
+    setPropsError(null);
+    casePropositions(data.case.case_id)
+      .then((r) => !cancelled && setProps(r))
+      .catch(() => !cancelled && setPropsError(API_DOWN))
+      .finally(() => !cancelled && setPropsLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [step, data, props]);
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-8">
@@ -179,10 +202,7 @@ export default function Analyze() {
             <TreatmentStep classify={classify} loading={classifyLoading} error={classifyError} />
           )}
           {step === 3 && (
-            <Placeholder
-              title="Relation"
-              body="Feature 3 — buckets edges by proposition and chains the foundation/refinement authorities (Heller → McDonald → Bruen → Rahimi)."
-            />
+            <RelationStep data={props} loading={propsLoading} error={propsError} />
           )}
           {step === 4 && <VerdictStep caseId={data.case.case_id} active={step === 4} />}
 
