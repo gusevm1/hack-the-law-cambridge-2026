@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { supabaseOrNull } from "@/lib/supabase";
 import { SignInBackdrop } from "@/components/sign-in-backdrop";
 
@@ -191,11 +192,14 @@ export function SignIn() {
 
 function Mark() {
   return (
-    <span className="grid h-7 w-7 place-items-center rounded-[9px] bg-primary text-primary-foreground shadow-sm">
-      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden>
-        <path d="M3 8.5l3 3 7-7.5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </span>
+    <Image
+      src="/logo.png"
+      alt="CiteMeRight"
+      width={28}
+      height={28}
+      priority
+      className="h-7 w-7 rounded-[9px] shadow-sm ring-1 ring-black/10 dark:ring-white/15"
+    />
   );
 }
 

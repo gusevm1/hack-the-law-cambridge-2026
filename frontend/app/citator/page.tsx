@@ -7,6 +7,7 @@
 // All live: /risk · /graph · /triage · /propositions · /verdict. The exhaustive
 // step-by-step (every edge, deep reads) lives one click away at /citator/analyze.
 import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "../../lib/auth";
 import { AccountMenu } from "../../components/account-menu";
@@ -108,7 +109,15 @@ export default function Citator() {
       <div className="mx-auto w-full max-w-6xl px-5 py-8">
         {/* header — brand · deep-dive · account */}
         <header className="mb-6 flex items-center justify-between gap-4">
-          <div className="flex items-baseline gap-2">
+          <div className="flex items-center gap-2.5">
+            <Image
+              src="/logo.png"
+              alt="CiteMeRight"
+              width={28}
+              height={28}
+              priority
+              className="h-7 w-7 rounded-[9px] ring-1 ring-white/15"
+            />
             <span className="text-base font-semibold tracking-tight text-white">CiteMeRight</span>
             <span className="hidden text-xs text-slate-500 sm:inline">is it still good law?</span>
           </div>
