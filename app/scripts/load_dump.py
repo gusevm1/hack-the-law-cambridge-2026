@@ -9,6 +9,7 @@ Atomic: all-or-nothing in one transaction.
         uv run python scripts/load_dump.py /path/to/citator-dump.sql    # load
 """
 import asyncio
+import io
 import os
 import re
 import sys
@@ -55,7 +56,7 @@ async def main(path: str, dry: bool) -> None:
                     continue
                 await apg.copy_to_table(
                     table, schema_name="public", columns=cols,
-                    source=data.encode("utf-8"), format="text")
+                    source=io.BytesIO(data.encode("utf-8")), format="text")
                 print(f"  loaded {table}")
     await dispose_engine()
     print("Done.")
