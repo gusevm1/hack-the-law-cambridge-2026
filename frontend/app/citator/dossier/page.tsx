@@ -287,28 +287,58 @@ export default function Dossier() {
               </Card>
             </div>
 
-            {/* propositions */}
-            {props?.propositions?.length ? (
-              <Card className="cmr-fade p-5">
-                <H>How each holding held up</H>
-                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {props.propositions.map((p) => {
-                    const ps = sigOf(p.signal);
-                    return (
-                      <div key={p.proposition_id} className="rounded-xl border border-white/10 p-3">
-                        <div className="flex items-center gap-2">
-                          <span className={`h-1.5 w-1.5 rounded-full ${ps.dot}`} />
-                          <span className="font-mono text-[11px] text-slate-400">{p.proposition_id}</span>
-                          <span className="text-sm font-medium text-white">{p.label}</span>
-                          <span className={`ml-auto text-[10px] uppercase ${ps.txt}`}>{p.status}</span>
+            {/* propositions at risk — how each holding fares under later cases */}
+            {props?.propositions?.length ? (() => {
+              const ranked = [...props.propositions].sort((a, b) => b.risk_score - a.risk_score);
+              const touched = ranked.filter((p) => p.timeline.length > 0 || p.risk_score > 0);
+              const gone = ranked.filter((p) => p.signal === "red" || p.status === "overruled").length;
+              return (
+                <Card className="cmr-fade p-5">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <H>Propositions at risk</H>
+                    <span className="text-xs text-slate-500">{touched.length}/{ranked.length} touched · {gone} overruled</span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500">How each holding of this case fares under later decisions — sorted by risk.</p>
+                  <div className="mt-4 space-y-3">
+                    {ranked.map((p) => {
+                      const ps = sigOf(p.signal);
+                      const pct = Math.round(p.risk_score * 100);
+                      return (
+                        <div key={p.proposition_id} className="rounded-xl border border-white/10 p-3.5">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-[11px] text-slate-500">{p.proposition_id}</span>
+                            <span className="text-sm font-medium text-white">{p.label}</span>
+                            <span className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ring-1 ${ps.chip}`}>{p.status}</span>
+                          </div>
+                          <div className="mt-2 flex items-center gap-2">
+                            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
+                              <div className={`h-full ${ps.dot}`} style={{ width: `${Math.max(pct, 3)}%` }} />
+                            </div>
+                            <span className={`w-12 text-right text-[11px] font-semibold tabular-nums ${ps.txt}`}>{pct}% risk</span>
+                          </div>
+                          {p.what_changed && <p className="mt-2 text-xs text-slate-400">{p.what_changed}</p>}
+                          {p.timeline.length > 0 && (
+                            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                              <span className="text-[10px] uppercase tracking-wide text-slate-600">Impacted by</span>
+                              {p.timeline.map((tp, i) => (
+                                <span key={i} className={`rounded-full px-2 py-0.5 text-[10px] ring-1 ${tp.polarity < 0 ? "bg-red-500/10 text-red-300 ring-red-500/30" : tp.polarity > 0 ? "bg-green-500/10 text-green-300 ring-green-500/30" : "bg-slate-500/10 text-slate-300 ring-slate-500/30"}`}>
+                                  {tp.case_name ?? "case"} ({tp.year}) · {tp.treatment}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {p.close_to_overruled?.flag && (
+                            <p className="mt-2 text-[11px] font-medium text-red-400">⚠ Close to overruled ({Math.round(p.close_to_overruled.confidence * 100)}%): {p.close_to_overruled.rationale}</p>
+                          )}
+                          {p.circuit_split?.present && <p className="mt-1.5 text-[11px] text-amber-300">Circuit split: {p.circuit_split.summary}</p>}
+                          {p.cert?.granted && <p className="mt-1.5 text-[11px] text-sky-300">Cert granted{p.cert.term ? ` (${p.cert.term})` : ""}{p.cert.question ? `: ${p.cert.question}` : ""}</p>}
                         </div>
-                        {p.what_changed && <p className="mt-1.5 text-xs text-slate-400">{p.what_changed}</p>}
-                      </div>
-                    );
-                  })}
-                </div>
-              </Card>
-            ) : null}
+                      );
+                    })}
+                  </div>
+                </Card>
+              );
+            })() : null}
 
             {/* treatments + use-aware verdict */}
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
