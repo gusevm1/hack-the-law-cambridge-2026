@@ -1,26 +1,97 @@
 @import "tailwindcss";
 
+/* ───────────────────────────────────────────────────────────────────────────
+   THEME TOKENS — the single source of truth for color.
+   Re-theme the whole app by editing the values in this one block; every
+   component reads these via Tailwind utilities (bg-primary, text-muted,
+   border-border, bg-brand, …). All OKLCH so lightness/chroma stay perceptual.
+   ─────────────────────────────────────────────────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Theme-relative surfaces + ink (flip in dark mode below) */
+  --background: oklch(1 0 0);              /* page bg — pure white */
+  --foreground: oklch(0.21 0.012 230);    /* primary ink — near-black, faint cool */
+  --surface: oklch(0.985 0.004 220);      /* raised panels / inputs */
+  --muted: oklch(0.48 0.018 230);         /* secondary text — ≥4.5:1 on bg */
+  --border: oklch(0.91 0.006 230);        /* hairlines */
+  --ring: oklch(0.55 0.11 200);           /* focus ring */
+
+  /* Brand — the mineral-teal identity color (CTAs, links, accents) */
+  --primary: oklch(0.47 0.105 200);       /* solid teal — white text ≥4.5:1 */
+  --primary-foreground: oklch(0.99 0.005 200);
+
+  /* Brand panel — stays dark in BOTH themes (the split-auth showpiece) */
+  --brand: oklch(0.2 0.022 220);          /* near-black teal */
+  --brand-foreground: oklch(0.96 0.006 220);
+  --accent: oklch(0.74 0.12 195);         /* bright teal — glow + marks on brand */
+
+  /* Verdict signals — match the product (good law / eroding / high risk) */
+  --good: oklch(0.7 0.15 150);
+  --caution: oklch(0.8 0.14 85);
+  --risk: oklch(0.64 0.21 25);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: oklch(0.17 0.014 230);
+    --foreground: oklch(0.95 0.006 220);
+    --surface: oklch(0.215 0.016 230);
+    --muted: oklch(0.7 0.02 220);
+    --border: oklch(0.3 0.012 230);
+    --ring: oklch(0.7 0.12 200);
+
+    --primary: oklch(0.7 0.12 200);             /* bright teal */
+    --primary-foreground: oklch(0.18 0.02 220); /* dark text on bright teal */
+
+    --brand: oklch(0.16 0.02 220);
+    --brand-foreground: oklch(0.96 0.006 220);
+    --accent: oklch(0.76 0.12 195);
+  }
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-accent: var(--accent);
+  --color-good: var(--good);
+  --color-caution: var(--caution);
+  --color-risk: var(--risk);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* ── Motion: one orchestrated page-load rise. Reduced-motion → instant. ─────── */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rise {
+  animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise {
+    animation: none;
+  }
 }
