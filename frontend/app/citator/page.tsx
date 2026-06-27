@@ -176,7 +176,7 @@ export default function Citator() {
               this one; then we <span className="text-slate-200">analyze</span> how each treats it.
               Every signal is grounded — click any source to read the passage and follow it. Not
               legal advice.{" "}
-              <Link href="/assistant" className="text-sky-400 underline-offset-2 hover:underline">
+              <Link href="/assistant" className="text-slate-200 underline underline-offset-2 hover:text-white">
                 Try the assistant →
               </Link>
             </p>
@@ -332,7 +332,7 @@ export default function Citator() {
               />
               <Link
                 href="/citator/analyze"
-                className="text-xs font-medium text-sky-400 underline-offset-2 hover:underline"
+                className="text-xs font-medium text-slate-200 underline underline-offset-2 hover:text-white"
               >
                 Full step-by-step pipeline · per-proposition evolution + deep reads →
               </Link>
