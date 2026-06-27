@@ -157,12 +157,13 @@ export default function Dossier() {
             {graph && (
               <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_340px]">
                 <Card className="relative h-[600px] overflow-hidden">
-                  <div className="absolute left-4 top-4 z-10 flex gap-2 text-xs">
+                  <div className="absolute left-4 top-4 z-10 flex flex-wrap gap-2 text-xs">
                     <span className="rounded-full bg-white/5 px-3 py-1 ring-1 ring-white/10 text-slate-300">Citation graph</span>
                     <button onClick={() => setHideNeutral((v) => !v)}
                       className={`rounded-full px-3 py-1 ring-1 transition ${hideNeutral ? "bg-white/15 text-white ring-white/30" : "bg-white/5 text-slate-300 ring-white/10"}`}>
                       {hideNeutral ? "Treated only" : "All cites"}
                     </button>
+                    <span className="rounded-full bg-sky-500/15 px-3 py-1 text-sky-300 ring-1 ring-sky-400/30">Tip: click a case to read its passage</span>
                   </div>
                   <CitationGraph graph={graph} onSelect={setSel} hideNeutral={hideNeutral} />
                 </Card>
@@ -266,7 +267,7 @@ export default function Dossier() {
                     <span className="text-sm font-semibold uppercase tracking-wide">{verdict.real_risk ? "Risky for this use" : "Safe for this use"}</span>
                   </div>
                   <p className="mt-2 text-sm text-slate-300">{clean(verdict.risk_explanation)}</p>
-                  {verdict.close_to_overruled?.flag && <p className="mt-2 text-xs text-red-400">⚠ Close to overruled: {verdict.close_to_overruled.rationale}</p>}
+                  {verdict.close_to_overruled?.flag && <p className="mt-2 text-xs text-red-400">Close to overruled: {verdict.close_to_overruled.rationale}</p>}
                   <div className="mt-3 flex flex-wrap gap-2">
                     {verdict.per_proposition.map((p) => (
                       <span key={p.proposition_id} className={`rounded-full px-2.5 py-1 text-[11px] ring-1 ${sigOf(p.signal).ring} ${sigOf(p.signal).txt}`}>
@@ -342,7 +343,7 @@ export default function Dossier() {
                             </div>
                           )}
                           {p.close_to_overruled?.flag && (
-                            <p className="mt-2 text-[11px] font-medium text-red-400">⚠ Close to overruled ({Math.round(p.close_to_overruled.confidence * 100)}%): {p.close_to_overruled.rationale}</p>
+                            <p className="mt-2 text-[11px] font-medium text-red-400">Close to overruled ({Math.round(p.close_to_overruled.confidence * 100)}%): {p.close_to_overruled.rationale}</p>
                           )}
                           {p.circuit_split?.present && <p className="mt-1.5 text-[11px] text-amber-300">Circuit split: {p.circuit_split.summary}</p>}
                           {p.cert?.granted && <p className="mt-1.5 text-[11px] text-sky-300">Cert granted{p.cert.term ? ` (${p.cert.term})` : ""}{p.cert.question ? `: ${p.cert.question}` : ""}</p>}
