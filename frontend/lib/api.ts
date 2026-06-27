@@ -178,3 +178,111 @@ export type ClassifyResult = {
 export async function caseClassify(id: number): Promise<ClassifyResult> {
   return request(`/cases/${id}/classify`);
 }
+
+// ============================================================================ //
+// Pipeline contracts — Features 3–5. Mirror app/src/htl/models/api.py exactly.
+// Defined up front so the parallel features build to identical shapes; each
+// feature adds its own fetch function. See citator-pipeline-contracts.md.
+// ============================================================================ //
+
+// --- Feature 3 (A): /cases/{id}/analyze ------------------------------------- #
+export type PropositionFinding = {
+  proposition: string | null;
+  treatment: string;
+  what_changed: string;
+  holding_vs_dicta: string;
+  attribution: string; // "self" | "reported"
+  quote: string;
+  confidence: number;
+};
+
+export type AnalyzedEdge = TieredEdge & {
+  analysis_depth: string; // "full-text" | "snippet"
+  findings: PropositionFinding[];
+  case_summary: string;
+  model: string;
+};
+
+export type AnalyzeResult = {
+  case: CaseRef;
+  total: number;
+  counts: TriageCounts;
+  analyzed: number;
+  edges: AnalyzedEdge[];
+};
+
+// --- Feature 4 (B): /cases/{id}/propositions -------------------------------- #
+export type TimelinePoint = {
+  year: number;
+  court: string | null;
+  case_name: string | null;
+  treatment: string;
+  polarity: number; // -1 | 0 | +1
+};
+
+export type CircuitSplit = {
+  present: boolean;
+  follows: string[];
+  limits: string[];
+  summary: string;
+};
+
+export type CertStatus = {
+  granted: boolean;
+  case_name: string | null;
+  term: string | null;
+  question: string | null;
+  source: string | null;
+  as_of: string | null;
+};
+
+export type CloseToOverruled = { flag: boolean; confidence: number; rationale: string };
+
+export type PropositionVerdict = {
+  proposition_id: string;
+  label: string;
+  summary: string;
+  signal: string; // "green" | "amber" | "red" | "unknown"
+  status: string;
+  risk_score: number;
+  what_changed: string;
+  timeline: TimelinePoint[];
+  circuit_split: CircuitSplit | null;
+  cert: CertStatus | null;
+  close_to_overruled: CloseToOverruled;
+  supporting_edges: string[];
+};
+
+export type PropositionsResult = {
+  case: CaseRef;
+  operative_rule: string;
+  propositions: PropositionVerdict[];
+  as_of: string;
+};
+
+// --- Feature 5 (C): POST /cases/{id}/verdict -------------------------------- #
+export type UseMapping = {
+  use_label: string;
+  intent: string;
+  engaged_propositions: string[];
+  rationale: string;
+};
+
+export type UseProposition = {
+  proposition_id: string;
+  signal: string;
+  relevant_to_use: boolean;
+  note: string;
+};
+
+export type VerdictResult = {
+  case: CaseRef;
+  operative_rule: string;
+  use: UseMapping;
+  real_risk: boolean;
+  risk_explanation: string;
+  per_proposition: UseProposition[];
+  final_labels: string[];
+  close_to_overruled: CloseToOverruled;
+  as_of: string;
+};

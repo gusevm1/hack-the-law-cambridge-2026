@@ -190,3 +190,129 @@ class ClassifyResponse(BaseModel):
     counts: TriageCounts
     classified: int  # how many edges got the LLM (deep + shallow)
     edges: list[ClassifiedEdge]
+
+
+# =========================================================================== #
+# Pipeline contracts — Features 3–5 (deep-analyze · propositions · verdict).   #
+# Defined up front so the three parallel features build to IDENTICAL shapes and
+# compose on integration. Routes + logic land with each feature. See
+# .claude/handoffs/citator-pipeline-contracts.md.
+# =========================================================================== #
+
+
+# --- Feature 3 (A): GET /cases/{id}/analyze — deep per-case analysis -------- #
+class PropositionFinding(BaseModel):
+    """How one citing case treats ONE proposition of the target."""
+
+    proposition: str | None = None  # P1..P8, or null (whole-case)
+    treatment: str  # overruled | limited | followed | cited-neutral | …
+    what_changed: str  # one line: how this case affects that proposition
+    holding_vs_dicta: str  # "holding" | "dicta"
+    attribution: str  # "self" | "reported"
+    quote: str  # verbatim span, quote-verified against the source
+    confidence: float
+
+
+class AnalyzedEdge(TieredEdge):
+    """A tiered edge with its deep read. One case can touch several propositions, so
+    ``findings`` is a list. ``mention`` edges aren't analyzed (``findings=[]``)."""
+
+    analysis_depth: str  # "full-text" | "snippet" — provenance of the read
+    findings: list[PropositionFinding] = []
+    case_summary: str = ""  # one-line per-case verdict on the target
+    model: str  # gemini id | "keyword-fallback"
+
+
+class AnalyzeResponse(BaseModel):
+    case: CaseRef
+    total: int
+    counts: TriageCounts
+    analyzed: int  # edges that got the deep read (deep + shallow)
+    edges: list[AnalyzedEdge]
+
+
+# --- Feature 4 (B): GET /cases/{id}/propositions — evolution + risk --------- #
+class TimelinePoint(BaseModel):
+    year: int
+    court: str | None = None
+    case_name: str | None = None
+    treatment: str
+    polarity: int  # -1 negative · 0 neutral · +1 approving
+
+
+class CircuitSplit(BaseModel):
+    present: bool
+    follows: list[str] = []  # circuits aligned with the target
+    limits: list[str] = []  # circuits cutting against it
+    summary: str = ""
+
+
+class CertStatus(BaseModel):
+    """SCOTUS review status — code/curated-grounded only, never LLM-asserted."""
+
+    granted: bool
+    case_name: str | None = None
+    term: str | None = None  # e.g. "OT2025"
+    question: str | None = None
+    source: str | None = None  # supremecourt.gov / SCOTUSblog / CL docket
+    as_of: str | None = None  # YYYY-MM-DD — staleness is explicit
+
+
+class CloseToOverruled(BaseModel):
+    flag: bool
+    confidence: float
+    rationale: str  # grounded in signals, or "needs review" on conflict
+
+
+class PropositionVerdict(BaseModel):
+    proposition_id: str  # P1..P8
+    label: str
+    summary: str
+    signal: str  # "green" | "amber" | "red" | "unknown"
+    status: str  # good | good-but-eroding | limited | overruled | …
+    risk_score: float  # 0..1
+    what_changed: str  # narrative of the proposition's evolution
+    timeline: list[TimelinePoint] = []
+    circuit_split: CircuitSplit | None = None
+    cert: CertStatus | None = None
+    close_to_overruled: CloseToOverruled
+    supporting_edges: list[str] = []  # citing case names backing this verdict
+
+
+class PropositionsResponse(BaseModel):
+    case: CaseRef
+    operative_rule: str  # "Bruen, good law as modified by Rahimi (2024)"
+    propositions: list[PropositionVerdict]
+    as_of: str
+
+
+# --- Feature 5 (C): POST /cases/{id}/verdict — use-aware verdict ------------ #
+class VerdictRequest(BaseModel):
+    use: str = Field(min_length=1)  # the dropdown's proposition-aligned label
+    intent: str = ""  # free-form "how I'm using it" (refines)
+
+
+class UseMapping(BaseModel):
+    use_label: str
+    intent: str
+    engaged_propositions: list[str] = []  # P-ids the use depends on
+    rationale: str
+
+
+class UseProposition(BaseModel):
+    proposition_id: str
+    signal: str
+    relevant_to_use: bool  # is this a proposition the use depends on?
+    note: str
+
+
+class VerdictResponse(BaseModel):
+    case: CaseRef
+    operative_rule: str
+    use: UseMapping
+    real_risk: bool  # engaged ∩ compromised ≠ ∅
+    risk_explanation: str  # why it is / isn't real risk FOR THIS USE
+    per_proposition: list[UseProposition] = []
+    final_labels: list[str] = []
+    close_to_overruled: CloseToOverruled
+    as_of: str
