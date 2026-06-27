@@ -74,6 +74,11 @@ body {
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
+/* Tailwind v4 preflight resets <button> to cursor:default; restore the pointer. */
+button:not(:disabled) {
+  cursor: pointer;
+}
+
 /* ── Motion: one orchestrated page-load rise. Reduced-motion → instant. ─────── */
 @keyframes rise {
   from {
@@ -135,20 +140,20 @@ body {
    draws them all regardless of length; edges draw in then dissolve, nodes
    pulse. Per-element timing comes from inline --dur / --delay. Static when
    reduced-motion is requested (the base opacities below). */
-.edge { opacity: 0.16; stroke-dasharray: 1; }
-.node { opacity: 0.5; }
+.edge { opacity: 0.08; stroke-dasharray: 1; }
+.node { opacity: 0.22; }
 
 @keyframes edge-draw {
   0% { stroke-dashoffset: 1; opacity: 0; }
-  14% { opacity: 0.5; }
-  32% { stroke-dashoffset: 0; opacity: 0.5; }
-  60% { stroke-dashoffset: 0; opacity: 0.5; }
+  14% { opacity: 0.28; }
+  32% { stroke-dashoffset: 0; opacity: 0.28; }
+  60% { stroke-dashoffset: 0; opacity: 0.28; }
   74% { opacity: 0; }
   100% { stroke-dashoffset: 0; opacity: 0; }
 }
 @keyframes node-pulse {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 0.85; }
+  0%, 100% { opacity: 0.16; }
+  50% { opacity: 0.45; }
 }
 @media (prefers-reduced-motion: no-preference) {
   .edge { animation: edge-draw var(--dur, 8s) cubic-bezier(0.4, 0, 0.2, 1) var(--delay, 0s) infinite; }
