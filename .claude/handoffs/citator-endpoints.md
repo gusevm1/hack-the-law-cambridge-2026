@@ -29,5 +29,11 @@ Working, VERIFIED live, merged to `main` (all CI green). Data lives in the **loc
 3. Build the ensemble classifier (Gemini + Claude on Vertex) at `app/src/htl/llm/classify.py`.
 4. Ingest + classify 1–2 not-yet-overruled cases to demo amber/erosion; expand ground-truth beyond the 4-case stub.
 
+## Update — erosion-path validation (overnight)
+Two tuning fixtures added to the local DB (data-only, no code change):
+- **Auer v. Robbins (118089) → green** (risk_score 0.137). The non-red graded path (trend build, weighted neg-share, negative_treatments, positive_signal) runs correctly on live data and is **safe from false-red**. Landed green not amber — Gemini labeled *Kisor*'s 2019 narrowing as "followed", so only 1/40 negative. The amber *label* branch (`risk_score>0.4`) is **still unhit on real data**.
+- **Employment Division v. Smith (112404) → FALSE RED** (declared `overruled`/`abrogated` though Smith is still good law, `on_loc_overruled_list:false`). **This is the #1 reliability fix.** Root cause: the search snippet *"Congress responded to Smith **by enacting** the Religious Freedom Restoration Act"* is a **legislative** response (RFRA), not judicial overruling; Gemini tagged it `abrogated` (conf 0.95) and search-noise mis-attributed it to the unrelated *Wooden v. United States* (2022, an ACCA case); 3 duplicate snippet edges stacked the signal.
+- **Fix direction (expert-tuned classifier pass):** (a) distinguish **legislative abrogation** ("by enacting" / "Congress responded") from **judicial overruling** in the taxonomy — straight expert-Q1 material; (b) require the strong-negative citer to actually concern THIS case + de-dup identical snippet fragments; (c) do NOT just gate dispositive-red on `ground_truth` (the 4-case stub means most cases are `null` → would suppress all legitimate reds) — use **corroboration** (≥2 independent strong-negatives, or ensemble agreement) instead. Smith would then land amber on its `abrogated:3 + limited:1` share — giving the missing amber demo.
+
 ## Teardown note
 Delete this handoff (move to `.claude/handoffs/archive/`) when consumed.
