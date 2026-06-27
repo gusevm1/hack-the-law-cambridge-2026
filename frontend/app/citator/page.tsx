@@ -8,6 +8,7 @@
 // All endpoints are public + DB-backed (golden fallback offline). See app/src/htl/
 // routes/{resolve,graph,risk,triage,verdict}.py.
 import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "../../lib/auth";
 import { AccountMenu } from "../../components/account-menu";
@@ -156,6 +157,17 @@ export default function Citator() {
       <div className="mx-auto w-full max-w-7xl px-5 py-8">
         <header className="mb-6 flex items-start justify-between gap-4">
           <div>
+            <div className="mb-3 flex items-center gap-2.5">
+              <Image
+                src="/logo.png"
+                alt="CiteMeRight"
+                width={28}
+                height={28}
+                priority
+                className="h-7 w-7 rounded-[9px] ring-1 ring-white/15"
+              />
+              <span className="text-sm font-semibold tracking-tight text-white">CiteMeRight</span>
+            </div>
             <h1 className="text-2xl font-semibold tracking-tight text-white">
               Open Citator — is it still good law?
             </h1>
