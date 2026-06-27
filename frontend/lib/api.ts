@@ -154,3 +154,27 @@ export async function caseCitations(id: number): Promise<CitationsResult> {
 export async function caseTriage(id: number): Promise<TriageResult> {
   return request(`/cases/${id}/triage`);
 }
+
+export type EdgeClassification = {
+  treatment: string;
+  proposition: string | null;
+  holding_vs_dicta: string;
+  attribution: string; // "self" | "reported"
+  quote: string;
+  confidence: number;
+  model: string;
+};
+
+export type ClassifiedEdge = TieredEdge & { classification: EdgeClassification | null };
+
+export type ClassifyResult = {
+  case: CaseRef;
+  total: number;
+  counts: TriageCounts;
+  classified: number;
+  edges: ClassifiedEdge[];
+};
+
+export async function caseClassify(id: number): Promise<ClassifyResult> {
+  return request(`/cases/${id}/classify`);
+}

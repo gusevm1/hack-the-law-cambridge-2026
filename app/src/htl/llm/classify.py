@@ -26,6 +26,7 @@ from dataclasses import dataclass
 
 from google.genai import types
 
+from htl.citator.propositions import PROP_IDS, SPINE_TEXT
 from htl.llm import vertex
 from htl.settings import settings
 
@@ -189,3 +190,120 @@ async def classify_treatment(
         return await _classify_vertex(passage, target_name, target_citation)
     except Exception:  # auth/quota/transient/parse → never block the pipeline
         return classify_keyword(passage)
+
+
+# --------------------------------------------------------------------------- #
+# Proposition-level edge classifier (citator pipeline — Feature 2).            #
+# --------------------------------------------------------------------------- #
+# Same vocabulary + verbatim-quote discipline as above, but emits the *proposition*
+# the treatment hits (the spine) and the self-vs-reported attribution — the two
+# signals the whole-case ``classify_treatment`` doesn't carry.
+
+
+@dataclass
+class EdgeClass:
+    treatment: str
+    proposition: str | None  # spine id (P1..P8) the treatment hits, or None
+    holding_vs_dicta: str  # "holding" | "dicta"
+    attribution: str  # "self" | "reported"
+    quote: str  # verbatim span from the passage
+    confidence: float
+    model: str
+
+
+_HOLDING = ["holding", "dicta"]
+_ATTRIBUTION = ["self", "reported"]
+
+_EDGE_SYSTEM = (
+    "You are a legal citator working at the level of individual PROPOSITIONS. You "
+    "read a passage from a CITING opinion and decide how it treats the TARGET case "
+    "(NYSRPA v. Bruen and its progeny). Output strictly the JSON schema.\n\n"
+    "treatment — one label: overruled, reversed, abrogated, criticised, questioned, "
+    "limited, distinguished, followed, cited-neutral.\n\n"
+    "proposition — which of the target's propositions the treatment concerns. Pick "
+    "the single best id, or NONE if the passage treats no specific proposition:\n"
+    f"{SPINE_TEXT}\n\n"
+    "holding_vs_dicta — 'holding' if the treatment is part of the citing court's "
+    "binding reasoning; 'dicta' if it is in passing / hypothetical / background.\n\n"
+    "attribution — 'self' if THIS opinion is itself doing the treating; 'reported' "
+    "if it is merely quoting or describing ANOTHER opinion's treatment. CAUTION: the "
+    "phrases 'trapped in amber', 'dead ringer', and 'historical twin' originate in "
+    "United States v. Rahimi — a citer (other than Rahimi) using them is REPORTING "
+    "Rahimi's treatment, so attribution='reported'. Rahimi itself is 'self'.\n\n"
+    "quote — an EXACT verbatim span copied from the passage that justifies the label "
+    "(no paraphrase). If nothing justifies a treatment, use cited-neutral, low "
+    "confidence. confidence is your calibrated probability (0..1)."
+)
+
+_EDGE_SCHEMA = {
+    "type": "OBJECT",
+    "properties": {
+        "treatment": {"type": "STRING", "enum": TYPES},
+        "proposition": {"type": "STRING", "enum": [*PROP_IDS, "NONE"]},
+        "holding_vs_dicta": {"type": "STRING", "enum": _HOLDING},
+        "attribution": {"type": "STRING", "enum": _ATTRIBUTION},
+        "quote": {"type": "STRING"},
+        "confidence": {"type": "NUMBER"},
+    },
+    "required": ["treatment", "proposition", "holding_vs_dicta", "attribution", "quote",
+                 "confidence"],
+}
+
+
+async def _classify_edge_vertex(
+    passage: str, target_name: str | None, target_citation: str | None
+) -> EdgeClass:
+    target = " ".join(p for p in (target_name, f"({target_citation})" if target_citation else None) if p)
+    prompt = (
+        f"TARGET case (the cited case): {target or 'unknown'}\n\n"
+        f"PASSAGE from the citing opinion:\n\"\"\"\n{passage}\n\"\"\"\n\n"
+        "Classify how the passage treats the TARGET, at the proposition level."
+    )
+    resp = await vertex._get_client().aio.models.generate_content(
+        model=settings.gemini_model,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            system_instruction=_EDGE_SYSTEM,
+            response_mime_type="application/json",
+            response_schema=_EDGE_SCHEMA,
+            temperature=0.0,
+        ),
+    )
+    data = json.loads(resp.text or "{}")
+
+    treatment = data.get("treatment") if data.get("treatment") in TYPES else "cited-neutral"
+    prop = data.get("proposition")
+    prop = prop if prop in PROP_IDS else None  # "NONE"/garbage → None
+    hvd = data.get("holding_vs_dicta") if data.get("holding_vs_dicta") in _HOLDING else "dicta"
+    attribution = data.get("attribution") if data.get("attribution") in _ATTRIBUTION else "self"
+    quote = (data.get("quote") or "").strip()
+    if quote and _norm(quote) not in _norm(passage):  # anti-hallucination
+        quote = ""
+    try:
+        confidence = max(0.0, min(1.0, float(data.get("confidence", 0.0))))
+    except (TypeError, ValueError):
+        confidence = 0.0
+    return EdgeClass(treatment, prop, hvd, attribution, quote, confidence, settings.gemini_model)
+
+
+def classify_edge_keyword(passage: str, candidate_propositions: list[str] | None = None) -> EdgeClass:
+    """Deterministic safety net: reuse the keyword treatment, and take the
+    proposition from the filter's already-computed phrase hits (first one)."""
+    base = classify_keyword(passage)
+    prop = candidate_propositions[0] if candidate_propositions else None
+    return EdgeClass(base.type, prop, "holding", "self", base.quote, 0.4, "keyword-fallback")
+
+
+async def classify_edge(
+    passage: str,
+    target_name: str | None = None,
+    target_citation: str | None = None,
+    candidate_propositions: list[str] | None = None,
+) -> EdgeClass:
+    """Proposition-level edge classification; keyword fallback if Vertex is down."""
+    if not (passage or "").strip():
+        return EdgeClass("cited-neutral", None, "dicta", "self", "", 0.0, "keyword-fallback")
+    try:
+        return await _classify_edge_vertex(passage, target_name, target_citation)
+    except Exception:  # auth/quota/transient/parse → never block the pipeline
+        return classify_edge_keyword(passage, candidate_propositions)

@@ -160,3 +160,33 @@ class TriageResponse(BaseModel):
     total: int
     counts: TriageCounts
     edges: list[TieredEdge]
+
+
+# --- GET /cases/{id}/classify — per-edge proposition-level treatment -------- #
+class EdgeClassification(BaseModel):
+    """The LLM's read of one edge: what treatment, which proposition, holding vs
+    dicta, who did it (self vs reported), the verbatim justifying span, and how
+    confident — schema-constrained + quote-verified (code decides, model reads)."""
+
+    treatment: str  # overruled | limited | followed | cited-neutral | …
+    proposition: str | None = None  # spine id (P1..P8) it hits, or null (whole-case)
+    holding_vs_dicta: str  # "holding" | "dicta"
+    attribution: str  # "self" | "reported"
+    quote: str  # verbatim span from the passage
+    confidence: float
+    model: str  # gemini model id, or "keyword-fallback"
+
+
+class ClassifiedEdge(TieredEdge):
+    """A tiered edge plus its classification. ``mention`` edges are surfaced but not
+    classified (``classification=null``) — the filter already judged them noise."""
+
+    classification: EdgeClassification | None = None
+
+
+class ClassifyResponse(BaseModel):
+    case: CaseRef
+    total: int
+    counts: TriageCounts
+    classified: int  # how many edges got the LLM (deep + shallow)
+    edges: list[ClassifiedEdge]
