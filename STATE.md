@@ -9,28 +9,37 @@ Where the project is right now. Update this as reality moves.
 
 ## Live
 - **GCP project:** `llm-law-cambridge26cbx-522` ("Hack the Law-522" — Google-managed dev sandbox, account `devstar5221@gcplab.me`, org "No organization"). Switched off the old throwaway `hack-the-law-cambridge-2026` on 2026-06-27 via `bootstrap` + public-IP migrate + `deploy`.
-- **Cloud Run service:** `htl-api` @ `europe-west1`. URL: `https://htl-api-4h4hpkfmqq-ew.a.run.app` (revision `htl-api-00002-6h2`). Cloud SQL attached + Supabase env (issuer/JWKS unchanged). Live: `/health` → ok; `/cases/{id}/risk` → 200 (runtime compute SA reaches Cloud SQL via the connector); `/cases/{id}/citations` + `/cases/{id}/triage` → 200 (DB-independent stub + pure filter). Public (`--allow-unauthenticated`); the app-level JWT gate is the real access control. Deploy from a laptop with `PROJECT_ID=llm-law-cambridge26cbx-522 just deploy` (the script's default PROJECT_ID is still the old throwaway).
+- **Cloud Run service:** `htl-api` @ `europe-west1`. URL: `https://htl-api-4h4hpkfmqq-ew.a.run.app` (revision `htl-api-00003-2l7`). Cloud SQL attached + Supabase env (issuer/JWKS unchanged). Live: `/health` → ok; `/cases/{id}/risk` → 200 (runtime compute SA reaches Cloud SQL via the connector); `/cases/{id}/citations` + `/cases/{id}/triage` → 200 (DB-independent stub + pure filter); `/cases/{id}/classify` → 200 (real Gemini via the runtime SA — Rahimi→limited/P2a etc.). Public (`--allow-unauthenticated`); the app-level JWT gate is the real access control. Deploy from a laptop with `PROJECT_ID=llm-law-cambridge26cbx-522 just deploy` (the script's default PROJECT_ID is still the old throwaway).
 - **Cloud SQL:** `htl-db` @ `europe-west1` (POSTGRES_16, db-f1-micro, ENTERPRISE edition). DB `htl`, user `htl_app` (password in Secret Manager `htl-db-password`). Conn: `llm-law-cambridge26cbx-522:europe-west1:htl-db`. **Migrated to `0002`**, then ingested + classified on prod (150 `cl_opinions`, 157 `citation_edges`, `treatments` populated). ⚠️ The Cloud SQL **connector** (`connectSettings` API) is blocked for the **user** identity on this sandbox (`boss::NOT_AUTHORIZED`, even with `editor`+`cloudsql.client` — a higher-level lab guardrail, no project deny policy), so `just migrate` fails from a laptop. Workaround for migrate/ingest from a laptop: allowlist your egress IP (`gcloud sql instances patch htl-db --authorized-networks=<ip>/32`) and run alembic/scripts with `DATABASE_URL=postgresql+pg8000://htl_app:<pw>@<public-ip>:5432/htl` and `INSTANCE_CONNECTION_NAME=""`. The **runtime SA on Cloud Run is NOT blocked** — it uses the connector normally.
 - **Vercel:** `https://hack-the-law-cambridge-2026.vercel.app` (live, `main` auto-deploys). `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` set in Production. ✅ `NEXT_PUBLIC_API_URL` is correct — Production builds against `https://htl-api-4h4hpkfmqq-ew.a.run.app` (verified in the live bundle 2026-06-27).
 - **Supabase** (auth-only): project `hack-the-law-cambridge-2026`, ref `seowjktpscgkklvmlvep` (London), ES256/JWKS. Persists across the GCP account switch.
 
-## Open citator (live: /resolve + /cases/{id}/risk + /cases/{id}/{citations,triage})
-- **Proposition-level pipeline — Feature 1 (Filter) SHIPPED + DEPLOYED** (PR #26).
-  The aligned spec is `.claude/handoffs/citator-pipeline-scope.md` (vision →
-  retrieval contract → proposition spine P1–P8 → Bruen golden example → per-feature
-  roadmap). Stage 1 is a deterministic **triage/filter**: `citator/triage.py::tier_edges`
-  (pure, mirrors `risk.py`) tiers inbound edges `deep|shallow|mention` — never drops
-  (noise → `mention`). `GET /cases/{id}/citations` is a contract-true **stub** of the
-  retrieval engine seeded with the real Bruen golden set (cluster 6480696); `GET
-  /cases/{id}/triage` runs the filter. Both public, DB-independent. Frontend
-  `/citator/analyze` is the pipeline **stepper** (Resolve → Citations live;
-  Treatment/Relation/Verdict are placeholders for Features 2–5). Bruen funnel: 7 →
-  deep 2 · shallow 3 · mention 2, grouped by proposition. **Retrieval engineer's
-  ingestion contract: `.claude/handoffs/retrieval-ingestion-contract.md`** (wire
-  shape + the per-edge `passage` column to add on `citation_edges`).
-- **Next pipeline features** (each its own PR, consume the prior stage): 2 Classify
-  `[LLM]` (per-edge treatment + scope→proposition + attribution + verbatim quote) ·
-  3 Relate · 4 Aggregate (per-proposition signed risk → operative rule) · 5 Synthesize.
+## Open citator (live: /resolve + /cases/{id}/{risk,citations,triage,classify})
+- **Proposition-level pipeline — Features 1 (Filter) + 2 (Classify) SHIPPED +
+  DEPLOYED** (PRs #26, #27). The aligned spec is
+  `.claude/handoffs/citator-pipeline-scope.md` (vision → retrieval contract →
+  proposition spine P1–P8 → Bruen golden example → per-feature roadmap).
+  - **F1 Filter** — `citator/triage.py::tier_edges` (pure, mirrors `risk.py`) tiers
+    inbound edges `deep|shallow|mention`, never drops (noise → `mention`). `GET
+    /cases/{id}/citations` is a contract-true **stub** of the retrieval engine
+    seeded with the real Bruen golden set (cluster 6480696); `GET /cases/{id}/triage`
+    runs the filter. Bruen funnel: 7 → deep 2 · shallow 3 · mention 2.
+  - **F2 Classify** — `GET /cases/{id}/classify` triages then runs Gemini **only on
+    deep+shallow** edges (mentions skip), per-edge: treatment · proposition (P1..P8)
+    · holding/dicta · attribution (self|reported, catches the Rahimi "trapped in
+    amber" trap) · verbatim quote · confidence. `llm/classify.py::classify_edge`
+    (Vertex + quote-verify; keyword fallback). Live Gemini: Rahimi→limited/P2a,
+    Antonyuk→followed/P1, §922(g)→P5, Wolford→P3.
+  - Proposition spine is one source of truth: `citator/propositions.py`.
+  - All endpoints public, DB-independent. Frontend `/citator/analyze` is the
+    pipeline **stepper**: Resolve → Citations → Treatment (all live) → Relation →
+    Verdict (placeholders for Features 3–5). Grouped by proposition throughout.
+  - **Retrieval engineer's ingestion contract:**
+    `.claude/handoffs/retrieval-ingestion-contract.md` (wire shape + the per-edge
+    `passage` column to add on `citation_edges`).
+- **Next pipeline features** (each its own PR, consume the prior stage): 3 Relate
+  (bucket by proposition; foundation/refinement chain) · 4 Aggregate (per-proposition
+  signed risk → operative rule) · 5 Synthesize (grounded rationale).
 - **Tables** (migration `0002_citator`): `cl_opinions` (CL id PK, case_name, court, date_filed, citation, plain_text, source), `citation_edges` (composite PK citing_id+cited_id, depth), `treatments` (empty — a later agent classifies passages into it). Models in `app/src/htl/db/citator.py`.
 - **Ingestion**: `cd app && uv run python scripts/ingest_citator.py` (idempotent upserts; `--seed` for an offline real-overrulings fallback). **No CL token needed** — uses the CourtListener v4 **search** endpoint (`q=cites:(<op_id>) "<cite>"&highlight=on`), which returns the inbound graph + a citing-passage snippet stored as `plain_text`. A `COURTLISTENER_TOKEN` only adds optional full-text enrichment (paced ≤4/min via `/opinions/<id>/`).
 - **Seeded the 4 LoC "Decisions Overruled" targets**: Roe (108713), Plessy (94508), Bowers (111738), Lochner (96276). Live run: 150 `cl_opinions`, 157 `citation_edges`, all `source=cl_api`; snippets carry real treatment language (e.g. a Roe citer: "...overruled Casey and Roe v. Wade... See Dobbs").
