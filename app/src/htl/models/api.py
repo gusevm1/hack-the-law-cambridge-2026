@@ -316,3 +316,40 @@ class VerdictResponse(BaseModel):
     final_labels: list[str] = []
     close_to_overruled: CloseToOverruled
     as_of: str
+
+
+# --- GET /cases/{id}/graph — the treatment network -------------------------- #
+class GraphNode(BaseModel):
+    """One case in the citation network: the focal authority or one of its citers."""
+
+    case_id: int
+    case_name: str | None = None
+    citation: str | None = None
+    court: str | None = None
+    date_filed: str | None = None
+    is_focal: bool = False
+
+
+class GraphEdge(BaseModel):
+    """A citing→cited edge, carrying the treatment that grounds its colour. One edge
+    per citer (the most severe / most confident treatment when several exist).
+    ``treatment=None`` is a neutral citation — cited but not treated."""
+
+    citing_id: int
+    cited_id: int
+    treatment: str | None = None  # overruled | distinguished | followed | … | None
+    polarity: str = "neutral"  # "negative" | "positive" | "neutral"
+    confidence: float | None = None
+    quote: str | None = None
+    on_other_grounds: bool = False
+    source_url: str | None = None  # deep link to the citing opinion (the receipt)
+
+
+class GraphResponse(BaseModel):
+    """The focal case + its inbound treatment network, for the graph view. Pairs
+    with /risk: /risk is the verdict, /graph is the evidence you can click."""
+
+    focal: CaseRef
+    signal: str  # mirrors /risk: red | amber | green | unknown
+    nodes: list[GraphNode]
+    edges: list[GraphEdge]
