@@ -14,8 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Hack the Law — Legal Assistant",
-  description: "Legal chatbot for Hack the Law Cambridge 2026.",
+  title: "CiteMeRight — is it still good law?",
+  description:
+    "CiteMeRight reads the citation graph and tells you whether a case still holds — before you stake an argument on it.",
 };
 
 export default function RootLayout({
